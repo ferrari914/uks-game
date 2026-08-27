@@ -29,7 +29,7 @@ window.GAMES = [
   },
   {
     id: "ox-survival",
-    title: "OX 대명 서바이벌",
+    title: "OX 서바이벌",
     desc: "친구들과 실시간 멀티플레이! 틀린 쪽 발판은 무너진다. 마지막 한 명이 우승.",
     path: "games/ox-survival/index.html",
     emoji: "🕳️",
@@ -37,16 +37,9 @@ window.GAMES = [
     tags: ["퀴즈", "멀티", "서바이벌"],
     status: "ready",
     added: "2026-08-27"
-  },
-  {
-    id: "dressup",
-    title: "옷입히기 게임",
-    desc: "캐릭터에게 옷을 입혀 스타일을 완성하는 게임. (제작 예정)",
-    path: "games/dressup/index.html",
-    emoji: "👗",
-    color: ["#ec4899", "#f59e0b"],
-    tags: ["캐주얼", "꾸미기"],
-    status: "wip",
-    added: "2026-08-27"
   }
 ];
+
+/* 옷입히기(dressup)는 RPG 컨셉 전환에 따라 게임이 아니라
+   캐릭터 프로필/꾸미기 화면(profile/index.html)으로 재분류되어
+   이 목록에서 제외했습니다. games/dressup/ 폴더는 그대로 남아 있습니다. */
