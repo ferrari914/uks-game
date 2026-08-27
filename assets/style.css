@@ -98,6 +98,15 @@ header { padding: var(--s8) 0 var(--s6); text-align: center; }
   color: transparent;
 }
 
+/* 태그라인 — 로고가 이미 강하므로 조용하게. 네온색은 쓰지 않는다 (본문 대비 6.2:1) */
+.tagline {
+  margin-top: var(--s3);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
 .stats {
   margin-top: var(--s6);
   display: flex; justify-content: center; gap: var(--s2);
