@@ -154,7 +154,7 @@ body:not(.touch) #hint{display:block}
       <canvas id="board"></canvas>
       <div id="msg"></div>
       <div id="overlay" class="show">
-        <h1 id="ovTitle">동욱's 테트리스</h1>
+        <h1 id="ovTitle">테트리스</h1>
         <p id="ovText"></p>
         <div class="btnRow">
           <button class="btn sm revive" id="ovRevive" style="display:none">부활 찬스</button>
@@ -1053,7 +1053,7 @@ if(window.ResizeObserver){ new ResizeObserver(function(){ fitAll(); }).observe(w
 reset();
 fitAll();
 setTimeout(fitAll,120);
-showOverlay("동욱's 테트리스",
+showOverlay("테트리스",
   document.body.classList.contains('touch')
     ? '화면을 <b>좌우로 드래그</b>해 이동, <b>탭</b>하면 회전<br>아래 버튼으로도 조작할 수 있어요'
     : '<b>←→</b> 이동 · <b>↑</b> 회전 · <b>Space</b> 하드드롭 · <b>C</b> 홀드',
