@@ -97,8 +97,6 @@ body{
 .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line);font-weight:700;font-size:13.5px;padding:11px 18px}
 .btn.ghost:hover{border-color:var(--accent)}
 .btn.gold{background:linear-gradient(180deg,#ffdf8a,#e0a92f);color:#2a1c00}
-.row2{display:flex;gap:7px}
-.row2>*{flex:1;min-width:0}
 .foot{flex:none;display:flex;flex-direction:column;gap:7px;padding-top:2px}
 .ver{font-size:10px;color:#5b6480;text-align:center;letter-spacing:.04em;padding:2px 0 4px}
 /* ---- 커버(기기 넘기기) ---- */
@@ -514,6 +512,17 @@ var round=0;
 /* ================= 화면 전환 ================= */
 var PHASE_NAME={setup:'설정',reveal:'역할 확인',describe:'설명 라운드',debate:'토론',
   vote:'비밀 투표',tally:'개표',guess:'라이어 추리',result:'결과'};
+/* 기기를 넘길 때 가리는 커버 화면 — 역할 확인·투표·라이어 추리가 같은 구조를 쓴다.
+   비밀 유지의 핵심 장치이므로 구현을 한 곳에 모은다. */
+function coverHTML(em,head,warn,desc,pill){
+  return '<div class="cover">'+
+    '<div class="em">'+em+'</div>'+
+    '<h3>'+head+'</h3>'+
+    '<p class="warn">'+warn+'</p>'+
+    '<p>'+desc+'</p>'+
+    (pill?'<span class="pill">'+pill+'</span>':'')+
+  '</div>';
+}
 function show(id){
   var all=document.querySelectorAll('.sc');
   for(var i=0;i<all.length;i++)all[i].classList.remove('show');
@@ -701,14 +710,10 @@ function paintReveal(){
   var i=state.revealPtr,nm=state.names[i];
   var body=$('#revealBody'),btn=$('#revealBtn');
   if(!state.revealOpen){
-    body.innerHTML=
-      '<div class="cover">'+
-        '<div class="em">📱</div>'+
-        '<h3><b>'+esc(nm)+'</b>님 차례입니다</h3>'+
-        '<p class="warn">다른 사람은 화면을 보지 마세요</p>'+
-        '<p>기기를 '+esc(nm)+'님에게 넘긴 뒤<br>아래 버튼을 누르세요.</p>'+
-        '<span class="pill">'+(i+1)+' / '+state.n+'</span>'+
-      '</div>';
+    body.innerHTML=coverHTML('📱','<b>'+esc(nm)+'</b>님 차례입니다',
+      '다른 사람은 화면을 보지 마세요',
+      '기기를 '+esc(nm)+'님에게 넘긴 뒤<br>아래 버튼을 누르세요.',
+      (i+1)+' / '+state.n);
     btn.textContent='내 카드 보기';
     btn.className='btn';
   }else{
@@ -824,14 +829,10 @@ function paintVote(){
   var i=state.votePtr,nm=state.names[i];
   var body=$('#voteBody'),btn=$('#voteBtn');
   if(!state.voteOpen){
-    body.innerHTML=
-      '<div class="cover">'+
-        '<div class="em">🗳</div>'+
-        '<h3><b>'+esc(nm)+'</b>님 차례입니다</h3>'+
-        '<p class="warn">다른 사람은 화면을 보지 마세요</p>'+
-        '<p>라이어로 의심되는 사람을 고릅니다.<br>선택은 개표 전까지 비밀입니다.</p>'+
-        '<span class="pill">'+(i+1)+' / '+state.n+'</span>'+
-      '</div>';
+    body.innerHTML=coverHTML('🗳','<b>'+esc(nm)+'</b>님 차례입니다',
+      '다른 사람은 화면을 보지 마세요',
+      '라이어로 의심되는 사람을 고릅니다.<br>선택은 개표 전까지 비밀입니다.',
+      (i+1)+' / '+state.n);
     btn.textContent='투표하기';
     btn.className='btn';
     btn.disabled=false;
@@ -960,14 +961,10 @@ function paintGuess(){
   var body=$('#guessBody'),btn=$('#guessBtn');
   if(!state.guessOpen){
     stopTimer();
-    body.innerHTML=
-      '<div class="cover">'+
-        '<div class="em">🎯</div>'+
-        '<h3><b>'+esc(nm)+'</b>님에게 기기를 넘기세요</h3>'+
-        '<p class="warn">라이어 본인만 보세요</p>'+
-        '<p>마지막 기회입니다. 제시어를 맞히면 역전승.</p>'+
-        (state.guessQueue.length>1?'<span class="pill">라이어 '+(state.guessPtr+1)+' / '+state.guessQueue.length+'</span>':'')+
-      '</div>';
+    body.innerHTML=coverHTML('🎯','<b>'+esc(nm)+'</b>님에게 기기를 넘기세요',
+      '라이어 본인만 보세요',
+      '마지막 기회입니다. 제시어를 맞히면 역전승.',
+      state.guessQueue.length>1?'라이어 '+(state.guessPtr+1)+' / '+state.guessQueue.length:'');
     btn.textContent='추리 시작';
     btn.className='btn';
     btn.disabled=false;
