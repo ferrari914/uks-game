@@ -39,6 +39,17 @@ window.GAMES = [
     added: "2026-08-27"
   },
   {
+    id: "mafia",
+    title: "마피아",
+    desc: "친구들과 방을 만들어 함께 하는 실시간 마피아. 혼자서도 즐길 수 있습니다.",
+    path: "games/mafia/index.html",
+    emoji: "🔪",
+    color: ["#e02947", "#4c1d95"],
+    tags: ["추리", "멀티", "싱글", "심리"],
+    status: "ready",
+    added: "2026-08-27"
+  },
+  {
     id: "catchmind",
     title: "캐치마인드",
     desc: "제시어를 그림으로! 친구들과 실시간으로 그리고 맞히는 그림 퀴즈.",
@@ -46,6 +57,17 @@ window.GAMES = [
     emoji: "🎨",
     color: ["#f59e0b", "#ec4899"],
     tags: ["그림", "퀴즈", "멀티"],
+    status: "ready",
+    added: "2026-08-28"
+  },
+  {
+    id: "liar",
+    title: "라이어 게임",
+    desc: "한 기기를 돌려가며 즐기는 3~10인 파티 추리 게임. 라이어를 찾아내라.",
+    path: "games/liar/index.html",
+    emoji: "🎭",
+    color: ["#a97bff", "#3b1d6e"],
+    tags: ["파티", "추리", "심리"],
     status: "ready",
     added: "2026-08-28"
   }
