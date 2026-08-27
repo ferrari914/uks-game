@@ -37,6 +37,17 @@ window.GAMES = [
     tags: ["퀴즈", "멀티", "서바이벌"],
     status: "ready",
     added: "2026-08-27"
+  },
+  {
+    id: "catchmind",
+    title: "캐치마인드",
+    desc: "제시어를 그림으로! 친구들과 실시간으로 그리고 맞히는 그림 퀴즈.",
+    path: "games/catchmind/index.html",
+    emoji: "🎨",
+    color: ["#f59e0b", "#ec4899"],
+    tags: ["그림", "퀴즈", "멀티"],
+    status: "ready",
+    added: "2026-08-28"
   }
 ];
 
