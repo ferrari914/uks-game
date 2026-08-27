@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0a0d16">
+<meta name="description" content="한 기기를 돌려가며 즐기는 3~10인 라이어 게임. 제시어 비공개 전달·비밀 투표·라이어 추리 찬스까지.">
+<meta property="og:title" content="라이어 게임">
+<meta property="og:description" content="한 기기를 돌려가며 즐기는 3~10인 파티 게임">
+<meta property="og:type" content="website">
+<title>라이어 게임</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d16;--panel:#141a2b;--panel2:#1b2338;--line:#28324f;
+  --text:#e8ecf7;--muted:#8b95b3;--accent:#a97bff;--gold:#ffd166;--cy:#37e0f0;
+}
+html,body{height:100%;overscroll-behavior:none}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR",system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  background-image:radial-gradient(900px 620px at 50% -12%,#241a45 0%,rgba(10,13,22,0) 66%);
+}
+#stage{
+  height:100vh;height:100dvh;width:100%;max-width:460px;
+  display:flex;flex-direction:column;gap:8px;
+  padding:calc(7px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+}
+/* ---- 헤더 ---- */
+#top{display:flex;align-items:center;gap:6px;flex:none}
+.back{position:relative;width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;color:var(--muted);
+  text-decoration:none;font-size:15px;font-weight:700}
+/* 보이는 상자는 32px(헤더 정렬 유지), 실제 터치 영역만 44px로 넓힌다 */
+.back::after,.ic::after{content:"";position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);width:44px;height:44px}
+.back:hover{color:var(--text);border-color:var(--accent)}
+#phaseBox{flex:1;min-width:0;display:flex;align-items:baseline;gap:6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:5px 10px;height:32px}
+#phaseName{font-size:13.5px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+#roundNum{font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#timer{flex:none;min-width:46px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--cy)}
+#timer.low{color:var(--accent);border-color:#432a6b}
+.ic{position:relative;width:32px;height:32px;flex:none;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;color:var(--muted);font-size:13px;font-family:inherit;font-weight:700;cursor:pointer}
+.ic:hover{color:var(--text);border-color:var(--accent)}
+.ic:active{transform:translateY(1px)}
+/* ---- 본문 ---- */
+#main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:flex;flex-direction:column}
+.sc{display:none;flex-direction:column;gap:8px;flex:1;min-height:0}
+.sc.show{display:flex}
+.pan{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px;
+  display:flex;flex-direction:column;gap:8px}
+.pan.mid{flex:1;justify-content:center;align-items:center;text-align:center;gap:12px}
+.pt{font-size:19px;font-weight:800;letter-spacing:.01em}
+.lead{font-size:12px;line-height:1.75;color:var(--muted);word-break:keep-all}
+.lead b{color:var(--text)}
+.lbl{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em}
+.lbl em{font-style:normal;color:var(--accent)}
+/* ---- 컨트롤 ---- */
+.seg{display:flex;gap:5px}
+.seg>button{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+  border-radius:9px;padding:9px 3px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg>button.on{border-color:var(--accent);color:var(--accent);background:rgba(169,123,255,.12)}
+.seg>button:disabled{opacity:.3;cursor:default}
+.seg>button:active{transform:translateY(1px)}
+.cnt{display:flex;align-items:center;gap:9px;justify-content:center}
+.sq{width:44px;height:44px;flex:none;background:var(--panel2);border:1px solid var(--line);
+  color:var(--text);border-radius:11px;font-size:20px;font-weight:800;font-family:inherit;cursor:pointer}
+.sq:active{transform:translateY(1px)}
+.sq:disabled{opacity:.3;cursor:default}
+.cntV{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;min-width:74px;text-align:center}
+.cntV small{font-size:13px;color:var(--muted);font-weight:700;margin-left:2px}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.names input{width:100%;background:#0d1220;border:1px solid var(--line);border-radius:9px;
+  padding:9px 10px;color:var(--text);font-family:inherit;font-size:13px;outline:none;min-width:0}
+.names input:focus{border-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:999px;
+  padding:8px 12px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer}
+.chip.on{border-color:var(--accent);color:var(--accent);background:rgba(169,123,255,.12)}
+.chip:active{transform:translateY(1px)}
+.chip.all{border-style:dashed}
+.btn{background:linear-gradient(180deg,#b98bff,#7c4ddb);color:#fff;border:0;border-radius:11px;
+  padding:14px 22px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;width:100%;
+  display:block;text-align:center;text-decoration:none}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line);font-weight:700;font-size:13.5px;padding:11px 18px}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.gold{background:linear-gradient(180deg,#ffdf8a,#e0a92f);color:#2a1c00}
+.row2{display:flex;gap:7px}
+.row2>*{flex:1;min-width:0}
+.foot{flex:none;display:flex;flex-direction:column;gap:7px;padding-top:2px}
+.ver{font-size:10px;color:#5b6480;text-align:center;letter-spacing:.04em;padding:2px 0 4px}
+/* ---- 커버(기기 넘기기) ---- */
+.cover{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px}
+.cover .em{font-size:52px;line-height:1.1}
+.cover h3{font-size:22px;font-weight:800;word-break:keep-all}
+.cover h3 b{color:var(--accent)}
+.cover p{font-size:12px;line-height:1.7;color:var(--muted);word-break:keep-all}
+.cover .warn{color:var(--gold);font-weight:800;font-size:12.5px}
+.pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+  padding:5px 12px;font-size:11px;font-weight:700;color:var(--muted)}
+/* ---- 역할 카드 ---- */
+.rcard{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
+  text-align:center;border-radius:14px;padding:22px 16px;
+  background:linear-gradient(160deg,#221a3d,#141a2b);border:1px solid #46368a}
+.rcard.liar{background:linear-gradient(160deg,#3a1b2e,#1a1220);border-color:#7a3358}
+.rcard .cat{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.06em}
+.rcard .cat b{color:var(--gold)}
+.rcard .word{font-size:34px;font-weight:800;letter-spacing:.01em;line-height:1.25;word-break:keep-all;color:#fff}
+.rcard .word.small{font-size:26px}
+.rcard .liarT{font-size:30px;font-weight:800;color:#ff7a9e;line-height:1.3}
+.rcard .note{font-size:11.5px;line-height:1.7;color:var(--muted);word-break:keep-all;max-width:300px}
+.rcard .spy{background:rgba(255,209,102,.1);border:1px solid #6a5520;border-radius:10px;
+  padding:8px 12px;font-size:13px;font-weight:800;color:var(--gold)}
+/* ---- 순서 목록 ---- */
+.order{display:flex;flex-direction:column;gap:5px}
+.orow{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:8px;
+  background:var(--panel2);border:1px solid transparent;border-radius:9px;padding:8px 10px;font-size:13px}
+.orow .no{font-size:11px;font-weight:800;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.orow .n{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orow .s{font-size:10.5px;font-weight:800;color:var(--muted)}
+.orow.now{border-color:var(--accent);background:rgba(169,123,255,.13)}
+.orow.now .n{color:var(--accent)}
+.orow.done{opacity:.42}
+/* ---- 투표/선택 목록 ---- */
+.picks{display:flex;flex-direction:column;gap:6px}
+.pick{display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:11px;
+  padding:13px 13px;font-size:14.5px;font-weight:700;font-family:inherit;cursor:pointer}
+.pick:active{transform:translateY(1px)}
+.pick.on{border-color:var(--accent);background:rgba(169,123,255,.15);color:var(--accent)}
+.pick .mk{width:18px;height:18px;flex:none;border-radius:50%;border:2px solid var(--line)}
+.pick.on .mk{border-color:var(--accent);background:var(--accent);box-shadow:inset 0 0 0 3px #141a2b}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opt{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:11px;
+  padding:15px 6px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opt:active{transform:translateY(1px)}
+.opt.on{border-color:var(--gold);color:var(--gold);background:rgba(255,209,102,.13)}
+/* ---- 개표 ---- */
+.tally{display:flex;flex-direction:column;gap:5px}
+.trow{background:var(--panel2);border:1px solid transparent;border-radius:10px;padding:8px 10px}
+.trow .th{display:flex;align-items:center;gap:8px}
+.trow .n{flex:1;min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .v{font-size:13px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;flex:none}
+.trow .from{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:3px;word-break:keep-all}
+.trow.top{border-color:var(--accent);background:rgba(169,123,255,.12)}
+.bar{height:4px;border-radius:3px;background:#2a3350;margin-top:6px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+/* ---- 결과 ---- */
+.big{font-size:27px;font-weight:800;text-align:center;letter-spacing:.02em;line-height:1.3}
+.big.cit{color:var(--cy)}
+.big.liar{color:#ff7a9e}
+.answer{text-align:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.answer .k{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em}
+.answer .w{font-size:28px;font-weight:800;color:var(--gold);margin-top:3px;word-break:keep-all}
+.answer .sub{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.6;word-break:keep-all}
+.rlist{list-style:none;display:flex;flex-direction:column;gap:5px}
+.rlist li{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;
+  background:var(--panel2);border:1px solid transparent;border-radius:9px;padding:8px 10px;font-size:13px}
+.rlist li.isLiar{border-color:#7a3358}
+.rlist li.isSpy{border-color:#6a5520}
+.rlist .n{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rlist .r{font-size:11px;font-weight:800;color:var(--muted)}
+.rlist li.isLiar .r{color:#ff7a9e}
+.rlist li.isSpy .r{color:var(--gold)}
+.rlist .g{font-size:12px;font-weight:800;color:var(--cy);font-variant-numeric:tabular-nums;min-width:26px;text-align:right}
+.rlist .g.zero{color:#5b6480}
+.score{list-style:none;display:flex;flex-direction:column;gap:4px}
+.score li{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:8px;
+  background:var(--panel2);border-radius:8px;padding:7px 9px;font-size:12.5px}
+.score .rk{font-size:11px;font-weight:800;color:var(--muted);text-align:center}
+.score .n{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.score .p{font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
+/* ---- 시트 ---- */
+.sheet{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+  padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(4,7,13,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.sheet.show{display:flex}
+.card{width:100%;max-width:420px;max-height:100%;display:flex;flex-direction:column;gap:12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
+  box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.cardHead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
+.cardHead h2{font-size:17px;font-weight:800}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:62vh;
+  display:flex;flex-direction:column;gap:10px}
+.hsec h4{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:4px}
+.hsec p{font-size:11.5px;line-height:1.75;color:var(--muted);word-break:keep-all}
+.hsec p b{color:var(--text)}
+@media (max-height:660px){
+  .cover .em{font-size:42px}
+  .cover h3{font-size:19px}
+  .rcard .word{font-size:29px}
+  .pt{font-size:17px}
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <header id="top">
+    <a class="back" href="../../index.html" title="허브로 돌아가기" aria-label="허브로 돌아가기">←</a>
+    <div id="phaseBox"><b id="phaseName">설정</b><span id="roundNum"></span></div>
+    <div id="timer">--</div>
+    <button class="ic" id="helpBtn" title="규칙" aria-label="규칙 보기">?</button>
+  </header>
+
+  <div id="main">
+
+    <!-- ========== 설정 ========== -->
+    <section class="sc show" id="scSetup">
+      <div class="pan">
+        <div class="pt">🕵️ 라이어 게임</div>
+        <p class="lead">기기 <b>한 대</b>를 돌려가며 하는 파티 게임.<br>
+          한 명만 제시어를 모릅니다. 설명과 토론은 <b>사람이 직접</b>, 앱은 제시어 전달과 투표만 맡습니다.</p>
+      </div>
+
+      <div class="pan">
+        <div class="lbl">인원</div>
+        <div class="cnt">
+          <button class="sq" id="pcMinus">−</button>
+          <div class="cntV"><span id="pcNum">4</span><small>명</small></div>
+          <button class="sq" id="pcPlus">＋</button>
+        </div>
+        <div class="names" id="nameList"></div>
+      </div>
+
+      <div class="pan">
+        <div class="lbl">주제 <em id="catCnt"></em></div>
+        <div class="chips" id="catList"></div>
+      </div>
+
+      <div class="pan">
+        <div class="lbl">모드</div>
+        <div class="seg" data-key="mode">
+          <button data-v="basic">기본</button>
+          <button data-v="fool">바보</button>
+          <button data-v="spy" id="modeSpy">스파이 <small>(5인+)</small></button>
+        </div>
+        <p class="lead" id="modeDesc"></p>
+
+        <div class="lbl">라이어 수</div>
+        <div class="seg" data-key="liarCount" data-num="1">
+          <button data-v="1">1명</button>
+          <button data-v="2" id="liar2">2명 <small>(6인+)</small></button>
+        </div>
+
+        <div class="lbl">설명 바퀴</div>
+        <div class="seg" data-key="laps" data-num="1">
+          <button data-v="1">1바퀴</button>
+          <button data-v="2">2바퀴</button>
+        </div>
+
+        <div class="lbl">1인 발언 제한</div>
+        <div class="seg" data-key="turnLimit" data-num="1">
+          <button data-v="0">끄기</button>
+          <button data-v="15">15초</button>
+          <button data-v="30">30초</button>
+        </div>
+
+        <div class="lbl">토론 시간</div>
+        <div class="seg" data-key="debate" data-num="1">
+          <button data-v="60">1분</button>
+          <button data-v="120">2분</button>
+          <button data-v="180">3분</button>
+          <button data-v="0">무제한</button>
+        </div>
+
+        <div class="lbl">추리 보기 수</div>
+        <div class="seg" data-key="guessOpts" data-num="1">
+          <button data-v="4">4개</button>
+          <button data-v="6">6개</button>
+          <button data-v="8">8개</button>
+        </div>
+
+        <div class="lbl">추리 제한시간</div>
+        <div class="seg" data-key="guessTimer" data-num="1">
+          <button data-v="30">30초</button>
+          <button data-v="0">끄기</button>
+        </div>
+      </div>
+
+      <div class="pan" id="scorePan" style="display:none">
+        <div class="lbl">누적 점수</div>
+        <ul class="score" id="setupScore"></ul>
+        <button class="btn ghost" id="resetScore">점수 초기화</button>
+      </div>
+
+      <div class="foot">
+        <button class="btn" id="startBtn">게임 시작</button>
+        <button class="btn ghost" id="rulesBtn">규칙 보기</button>
+        <div class="ver">v1.0.0</div>
+      </div>
+    </section>
+
+    <!-- ========== 역할 확인 ========== -->
+    <section class="sc" id="scReveal">
+      <div id="revealBody" style="flex:1;display:flex;flex-direction:column;min-height:0"></div>
+      <div class="foot"><button class="btn" id="revealBtn">내 카드 보기</button></div>
+    </section>
+
+    <!-- ========== 설명 라운드 ========== -->
+    <section class="sc" id="scDescribe">
+      <div class="pan">
+        <div class="lbl">지금 설명할 사람</div>
+        <div class="pt" id="dsNow" style="color:var(--accent)">-</div>
+        <p class="lead" id="dsHint"></p>
+      </div>
+      <div class="pan" style="flex:1;min-height:0;overflow-y:auto">
+        <div class="lbl">순서</div>
+        <div class="order" id="dsOrder"></div>
+      </div>
+      <div class="foot"><button class="btn" id="dsNext">다음 사람 →</button></div>
+    </section>
+
+    <!-- ========== 토론 ========== -->
+    <section class="sc" id="scDebate">
+      <div class="pan mid">
+        <div class="em" style="font-size:46px">💬</div>
+        <div class="pt">자유 토론</div>
+        <div id="dbBig" style="font-size:56px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold)">--</div>
+        <p class="lead">누가 라이어인지 이야기하세요.<br>준비되면 아래 버튼으로 바로 투표할 수 있습니다.</p>
+      </div>
+      <div class="foot"><button class="btn" id="dbVote">투표 시작</button></div>
+    </section>
+
+    <!-- ========== 비밀 투표 ========== -->
+    <section class="sc" id="scVote">
+      <div id="voteBody" style="flex:1;display:flex;flex-direction:column;min-height:0"></div>
+      <div class="foot"><button class="btn" id="voteBtn">투표하기</button></div>
+    </section>
+
+    <!-- ========== 개표 ========== -->
+    <section class="sc" id="scTally">
+      <div class="pan">
+        <div class="pt">📊 개표 결과</div>
+        <p class="lead" id="tlMsg"></p>
+      </div>
+      <div class="pan" style="flex:1;min-height:0;overflow-y:auto">
+        <div class="tally" id="tlList"></div>
+      </div>
+      <div class="foot"><button class="btn" id="tlNext">계속</button></div>
+    </section>
+
+    <!-- ========== 라이어 추리 ========== -->
+    <section class="sc" id="scGuess">
+      <div id="guessBody" style="flex:1;display:flex;flex-direction:column;min-height:0"></div>
+      <div class="foot"><button class="btn" id="guessBtn">확인</button></div>
+    </section>
+
+    <!-- ========== 결과 ========== -->
+    <section class="sc" id="scResult">
+      <div class="pan"><div class="big" id="rsTitle">-</div><p class="lead" id="rsDesc" style="text-align:center"></p></div>
+      <div class="answer" id="rsAnswer"></div>
+      <div class="pan" style="flex:1;min-height:0;overflow-y:auto">
+        <div class="lbl">정체 공개 · 이번 판 획득</div>
+        <ul class="rlist" id="rsList"></ul>
+        <div class="lbl" style="margin-top:4px">누적 점수</div>
+        <ul class="score" id="rsScore"></ul>
+      </div>
+      <div class="foot">
+        <button class="btn" id="rsNext">다음 라운드</button>
+        <button class="btn ghost" id="rsSetup">설정으로</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- 규칙 -->
+<div class="sheet" id="helpSheet">
+  <div class="card">
+    <div class="cardHead"><h2>규칙</h2><button class="ic" id="helpX">✕</button></div>
+    <div class="scroll">
+      <div class="hsec"><h4>진행 순서</h4><p>
+        <b>① 역할 확인</b> — 기기를 한 사람씩 넘기며 제시어를 확인합니다. 옆사람이 못 보게 하세요.<br>
+        <b>② 설명 라운드</b> — 순서대로 제시어를 한 문장씩 설명합니다.<br>
+        <b>③ 토론</b> — 누가 라이어인지 이야기합니다.<br>
+        <b>④ 비밀 투표</b> — 다시 기기를 돌려 한 명씩 지목합니다.<br>
+        <b>⑤ 개표</b> — 최다 득표자가 라이어면 라이어에게 마지막 추리 기회가 갑니다.</p></div>
+      <div class="hsec"><h4>승리 조건</h4><p>
+        투표로 라이어를 <b>못 맞히면</b> → 라이어 승리<br>
+        라이어를 맞혔지만 라이어가 <b>제시어를 맞히면</b> → 라이어 역전승<br>
+        라이어를 맞혔고 라이어가 <b>틀리면</b> → 시민 승리<br>
+        투표가 동률이면 재투표 1회, 그래도 동률이면 라이어 승리입니다.</p></div>
+      <div class="hsec"><h4>모드</h4><p>
+        <b>기본</b> — 라이어는 주제만 봅니다.<br>
+        <b>바보</b> — 라이어는 같은 주제의 <b>다른 제시어</b>를 봅니다. 자기가 라이어인 줄 모릅니다.<br>
+        <b>스파이</b> — 시민 한 명이 스파이가 되어 제시어와 <b>라이어의 정체</b>를 함께 봅니다. 스파이는 라이어 편입니다. <b>5인 이상</b>에서만 고를 수 있습니다.</p></div>
+      <div class="hsec"><h4>점수</h4><p>
+        라이어 승리 → 라이어(+스파이) 각 <b>+2</b><br>
+        라이어 역전승 → 라이어(+스파이) 각 <b>+1</b><br>
+        시민 승리 → 시민 각 <b>+1</b><br>
+        라이어를 정확히 지목한 시민 → 추가 <b>+1</b></p></div>
+      <div class="hsec"><h4>팁</h4><p>
+        시민은 <b>너무 구체적으로</b> 설명하면 라이어에게 제시어를 알려주는 셈입니다.
+        반대로 너무 애매하면 라이어로 의심받습니다.</p></div>
+    </div>
+    <button class="btn ghost" id="helpX2">닫기</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= 제시어 데이터 ================= */
+/* 카테고리 8개 × 각 40개. 수정하려면 여기만 고치면 된다. */
+const WORDS = {
+  "음식":["김치찌개","된장찌개","순두부찌개","부대찌개","삼겹살","치킨","피자","떡볶이","짜장면","짬뽕",
+    "비빔밥","라면","김밥","순대","냉면","만두","초밥","햄버거","돈까스","삼계탕",
+    "갈비탕","곱창","족발","보쌈","감자탕","칼국수","파전","탕수육","마라탕","카레",
+    "스파게티","샌드위치","계란찜","잡채","닭갈비","오므라이스","팥빙수","쌀국수","떡국","호떡"],
+
+  "동물":["사자","호랑이","코끼리","기린","원숭이","판다","코알라","캥거루","하마","악어",
+    "개구리","거북이","토끼","다람쥐","고슴도치","너구리","여우","늑대","곰","사슴",
+    "말","소","돼지","양","염소","낙타","얼룩말","펭귄","독수리","부엉이",
+    "앵무새","비둘기","고래","상어","문어","해파리","돌고래","박쥐","고양이","햄스터"],
+
+  "장소":["학교","병원","공항","백화점","놀이공원","도서관","편의점","영화관","노래방","PC방",
+    "찜질방","지하철역","목욕탕","수영장","헬스장","미용실","은행","우체국","경찰서","소방서",
+    "주유소","카페","캠핑장","해수욕장","스키장","동물원","수족관","박물관","미술관","교회",
+    "절","시장","마트","주차장","호텔","놀이터","옥상","엘리베이터","고속도로","기숙사"],
+
+  "영화·드라마":["겨울왕국","아바타","타이타닉","해리포터","반지의 제왕","기생충","부산행","명량","어벤져스","스파이더맨",
+    "토이스토리","라이온 킹","쥬라기 공원","인터스텔라","인셉션","트랜스포머","미션 임파서블","007","신과함께","극한직업",
+    "도둑들","국제시장","태극기 휘날리며","올드보이","살인의 추억","미나리","알라딘","미녀와 야수","쿵푸팬더","슈렉",
+    "오징어 게임","도깨비","태양의 후예","별에서 온 그대","응답하라 1988","슬기로운 의사생활","이태원 클라쓰","상속자들","시크릿 가든","대장금"],
+
+  "직업":["의사","간호사","교사","경찰관","소방관","판사","변호사","검사","요리사","미용사",
+    "가수","배우","개그맨","축구선수","야구선수","프로그래머","디자이너","건축가","농부","어부",
+    "택시기사","버스기사","파일럿","승무원","군인","우주비행사","화가","사진작가","작가","기자",
+    "아나운서","은행원","회계사","바리스타","제빵사","수의사","약사","치과의사","경비원","마술사"],
+
+  "스포츠":["축구","야구","농구","배구","탁구","배드민턴","테니스","골프","볼링","당구",
+    "수영","마라톤","유도","태권도","복싱","레슬링","씨름","펜싱","양궁","사격",
+    "스키","스노보드","스케이트","피겨스케이팅","아이스하키","컬링","체조","역도","승마","사이클",
+    "서핑","스쿠버다이빙","암벽등반","요가","필라테스","줄넘기","제기차기","피구","족구","럭비"],
+
+  "물건":["우산","손목시계","안경","지갑","가방","신발","모자","칫솔","수건","베개",
+    "이불","거울","가위","젓가락","냄비","프라이팬","냉장고","세탁기","청소기","에어컨",
+    "선풍기","텔레비전","노트북","휴대폰","이어폰","충전기","리모컨","자전거","자동차","열쇠",
+    "라이터","소화기","사다리","망치","드라이버","볼펜","지우개","스테이플러","카메라","드라이기"],
+
+  "인물·캐릭터":["세종대왕","이순신","안중근","유관순","신사임당","홍길동","흥부","심청이","춘향이","산타클로스",
+    "피노키오","신데렐라","백설공주","인어공주","라푼젤","엘사","뽀로로","짱구","도라에몽","피카츄",
+    "슈퍼맨","아이언맨","헐크","미키마우스","마리오","라이언","헬로키티","스폰지밥","톰과 제리","아기상어",
+    "손오공","김연아","손흥민","박지성","유재석","백종원","아인슈타인","에디슨","나폴레옹","셜록 홈즈"]
+};
+var CATS = Object.keys(WORDS);
+
+/* ================= 유틸 ================= */
+var $=function(s){return document.querySelector(s);};
+var rnd=function(n){return Math.floor(Math.random()*n);};
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=rnd(i+1);var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function josa(w,withF,noF){ // 받침 유무에 따라 조사 선택 (이순신'은' / 아바타'는')
+  var t=String(w),c=t.charCodeAt(t.length-1);
+  var hasFinal=(c>=0xAC00&&c<=0xD7A3)&&((c-0xAC00)%28!==0);
+  return hasFinal?withF:noF;
+}
+function mmss(s){s=Math.max(0,s|0);return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
+
+/* ================= 설정 ================= */
+var DEF={count:4,names:[],cats:CATS.slice(),mode:'basic',liarCount:1,laps:1,
+  turnLimit:0,debate:120,guessOpts:6,guessTimer:30};
+var cfg=JSON.parse(JSON.stringify(DEF));
+var scores={}; // 이름 → 누적 점수
+
+function loadStore(){
+  try{
+    var s=localStorage.getItem('liar_cfg');
+    if(s){var o=JSON.parse(s);for(var k in DEF){if(o[k]!==undefined)cfg[k]=o[k];}}
+    var sc=localStorage.getItem('liar_scores');
+    if(sc)scores=JSON.parse(sc)||{};
+  }catch(e){}
+  if(!Array.isArray(cfg.cats)||!cfg.cats.length)cfg.cats=CATS.slice();
+  cfg.cats=cfg.cats.filter(function(c){return CATS.indexOf(c)>=0;});
+  if(!cfg.cats.length)cfg.cats=CATS.slice();
+  cfg.count=Math.max(3,Math.min(10,cfg.count|0||4));
+  if(cfg.count<6)cfg.liarCount=1;
+  if(cfg.count<5&&cfg.mode==='spy')cfg.mode='basic';
+  fixNames();
+}
+function saveStore(){
+  try{
+    cfg.names=readNames();
+    localStorage.setItem('liar_cfg',JSON.stringify(cfg));
+    localStorage.setItem('liar_scores',JSON.stringify(scores));
+  }catch(e){}
+}
+function fixNames(){
+  if(!Array.isArray(cfg.names))cfg.names=[];
+  for(var i=0;i<10;i++){if(!cfg.names[i])cfg.names[i]='플레이어 '+(i+1);}
+  cfg.names.length=10;
+}
+
+/* ================= 상태 ================= */
+var state=null;
+var round=0;
+
+/* ================= 화면 전환 ================= */
+var PHASE_NAME={setup:'설정',reveal:'역할 확인',describe:'설명 라운드',debate:'토론',
+  vote:'비밀 투표',tally:'개표',guess:'라이어 추리',result:'결과'};
+function show(id){
+  var all=document.querySelectorAll('.sc');
+  for(var i=0;i<all.length;i++)all[i].classList.remove('show');
+  $('#sc'+id.charAt(0).toUpperCase()+id.slice(1)).classList.add('show');
+  $('#phaseName').textContent=PHASE_NAME[id]||id;
+  $('#roundNum').textContent=(id==='setup'||!round)?'':(round+'라운드');
+  $('#main').scrollTop=0;
+}
+
+/* ================= 타이머 ================= */
+var tmr={id:0,left:0,end:null,view:null};
+function stopTimer(){
+  if(tmr.id){clearInterval(tmr.id);tmr.id=0;}
+  tmr.end=null;tmr.view=null;
+  $('#timer').textContent='--';$('#timer').classList.remove('low');
+}
+function startTimer(sec,onEnd,viewEl){
+  stopTimer();
+  tmr.left=sec;tmr.end=onEnd||null;tmr.view=viewEl||null;
+  paintTimer();
+  tmr.id=setInterval(function(){
+    tmr.left--;paintTimer();
+    if(tmr.left<=0){var f=tmr.end;stopTimer();if(f)f();}
+  },1000);
+}
+function paintTimer(){
+  var t=$('#timer');
+  t.textContent=mmss(tmr.left);
+  t.classList.toggle('low',tmr.left<=10);
+  if(tmr.view)tmr.view.textContent=mmss(tmr.left);
+}
+
+/* ================= 설정 화면 ================= */
+function readNames(){
+  var out=cfg.names.slice();
+  var ins=document.querySelectorAll('#nameList input');
+  for(var i=0;i<ins.length;i++){
+    var v=ins[i].value.trim();
+    out[i]=v||('플레이어 '+(i+1));
+  }
+  return out;
+}
+function renderNames(){
+  fixNames();
+  var h='';
+  for(var i=0;i<cfg.count;i++){
+    h+='<input type="text" maxlength="6" value="'+esc(cfg.names[i])+'" placeholder="플레이어 '+(i+1)+'" autocomplete="off">';
+  }
+  $('#nameList').innerHTML=h;
+}
+function renderCats(){
+  var h='<button class="chip all" data-all="1">전체</button>';
+  for(var i=0;i<CATS.length;i++){
+    var on=cfg.cats.indexOf(CATS[i])>=0;
+    h+='<button class="chip'+(on?' on':'')+'" data-c="'+esc(CATS[i])+'">'+esc(CATS[i])+'</button>';
+  }
+  $('#catList').innerHTML=h;
+  $('#catCnt').textContent=cfg.cats.length+'개 선택';
+}
+var MODE_DESC={
+  basic:'라이어는 <b>주제만</b> 봅니다. 가장 기본적인 방식.',
+  fool:'라이어는 같은 주제의 <b>다른 제시어</b>를 봅니다. 자기가 라이어인 줄 모른 채 엉뚱한 설명을 하게 됩니다.',
+  spy:'시민 한 명이 <b>스파이</b>가 되어 제시어와 라이어의 정체를 함께 봅니다. 스파이는 라이어와 운명을 함께합니다.'
+};
+function renderSegs(){
+  // 스파이 모드는 5인 이상만. 4인 이하는 라이어팀(라이어+스파이)이 시민을 표로 이길 수 없어 게임이 성립하지 않는다.
+  if(cfg.count<5&&cfg.mode==='spy')cfg.mode='basic';
+  var segs=document.querySelectorAll('.seg[data-key]');
+  for(var i=0;i<segs.length;i++){
+    var key=segs[i].getAttribute('data-key');
+    var bs=segs[i].querySelectorAll('button');
+    for(var j=0;j<bs.length;j++){
+      bs[j].classList.toggle('on',String(cfg[key])===bs[j].getAttribute('data-v'));
+    }
+  }
+  $('#liar2').disabled=(cfg.count<6);
+  $('#modeSpy').disabled=(cfg.count<5);
+  $('#modeDesc').innerHTML=MODE_DESC[cfg.mode]||'';
+  $('#pcNum').textContent=cfg.count;
+  $('#pcMinus').disabled=(cfg.count<=3);
+  $('#pcPlus').disabled=(cfg.count>=10);
+}
+function renderSetupScore(){
+  var names=readNames().slice(0,cfg.count);
+  var any=false;
+  for(var i=0;i<names.length;i++){if(scores[names[i]])any=true;}
+  if(!any){$('#scorePan').style.display='none';return;}
+  $('#scorePan').style.display='';
+  $('#setupScore').innerHTML=scoreHTML(names);
+}
+function scoreHTML(names){
+  var rows=names.map(function(n){return {n:n,p:scores[n]||0};});
+  rows.sort(function(a,b){return b.p-a.p;});
+  return rows.map(function(r,i){
+    return '<li><span class="rk">'+(i+1)+'</span><span class="n">'+esc(r.n)+'</span><span class="p">'+r.p+'</span></li>';
+  }).join('');
+}
+
+/* 설정 화면 이벤트 */
+$('#pcMinus').onclick=function(){if(cfg.count>3){cfg.names=readNames();cfg.count--;if(cfg.count<6)cfg.liarCount=1;renderNames();renderSegs();renderSetupScore();saveStore();}};
+$('#pcPlus').onclick=function(){if(cfg.count<10){cfg.names=readNames();cfg.count++;renderNames();renderSegs();renderSetupScore();saveStore();}};
+$('#nameList').addEventListener('change',function(){renderSetupScore();saveStore();});
+$('#catList').onclick=function(e){
+  var b=e.target.closest('.chip');if(!b)return;
+  if(b.getAttribute('data-all')){
+    cfg.cats=(cfg.cats.length===CATS.length)?[CATS[0]]:CATS.slice();
+  }else{
+    var c=b.getAttribute('data-c'),i=cfg.cats.indexOf(c);
+    if(i>=0){if(cfg.cats.length>1)cfg.cats.splice(i,1);}else cfg.cats.push(c);
+  }
+  renderCats();saveStore();
+};
+document.addEventListener('click',function(e){
+  var b=e.target.closest('.seg[data-key] > button');if(!b)return;
+  var seg=b.parentNode,key=seg.getAttribute('data-key');
+  if(b.disabled)return;
+  cfg[key]=seg.getAttribute('data-num')?parseInt(b.getAttribute('data-v'),10):b.getAttribute('data-v');
+  renderSegs();saveStore();
+});
+$('#resetScore').onclick=function(){scores={};renderSetupScore();saveStore();};
+$('#rulesBtn').onclick=function(){$('#helpSheet').classList.add('show');};
+$('#helpBtn').onclick=function(){$('#helpSheet').classList.add('show');};
+$('#helpX').onclick=$('#helpX2').onclick=function(){$('#helpSheet').classList.remove('show');};
+$('#startBtn').onclick=function(){cfg.names=readNames();saveStore();newRound(true);};
+
+/* ================= 라운드 시작 ================= */
+var guardOn=false;
+function guard(on){
+  if(on===guardOn)return;guardOn=on;
+  if(on)window.addEventListener('beforeunload',beforeUnload);
+  else window.removeEventListener('beforeunload',beforeUnload);
+}
+function beforeUnload(e){e.preventDefault();e.returnValue='';return '';}
+
+function newRound(reset){
+  if(reset)round=0;
+  round++;
+  var names=cfg.names.slice(0,cfg.count);
+  var n=names.length;
+  var liarCount=(n>=6)?cfg.liarCount:1;
+  if(liarCount>=n)liarCount=1; // 안전장치
+
+  // 제시어 뽑기
+  var cat=cfg.cats[rnd(cfg.cats.length)];
+  var pool=WORDS[cat];
+  var word=pool[rnd(pool.length)];
+  var fool=null;
+  if(cfg.mode==='fool'){
+    do{fool=pool[rnd(pool.length)];}while(fool===word);
+  }
+
+  // 역할 배정
+  var idx=shuffle(names.map(function(_,i){return i;}));
+  var liars=idx.slice(0,liarCount);
+  var spy=-1;
+  var mode=(cfg.mode==='spy'&&n<5)?'basic':cfg.mode; // 안전장치
+  if(mode==='spy'){
+    var citizens=idx.slice(liarCount);
+    if(citizens.length)spy=citizens[rnd(citizens.length)];
+  }
+
+  state={
+    names:names,n:n,cat:cat,word:word,fool:fool,mode:mode,
+    liars:liars,spy:spy,
+    order:shuffle(names.map(function(_,i){return i;})),
+    turn:0,totalTurns:n*cfg.laps,
+    revealPtr:0,revealOpen:false,
+    votes:[],votePtr:0,votePick:-1,voteOpen:false,candidates:null,revoted:false,
+    accused:-1,caught:false,
+    guessQueue:[],guessPtr:0,guessOpen:false,guessOptions:[],guessPicks:[],guessHit:false,
+    gained:{}
+  };
+  guard(true);
+  goReveal();
+}
+
+/* ================= (2) 역할 확인 ================= */
+function goReveal(){
+  stopTimer();
+  state.revealOpen=false;
+  show('reveal');
+  paintReveal();
+}
+function paintReveal(){
+  var i=state.revealPtr,nm=state.names[i];
+  var body=$('#revealBody'),btn=$('#revealBtn');
+  if(!state.revealOpen){
+    body.innerHTML=
+      '<div class="cover">'+
+        '<div class="em">📱</div>'+
+        '<h3><b>'+esc(nm)+'</b>님 차례입니다</h3>'+
+        '<p class="warn">다른 사람은 화면을 보지 마세요</p>'+
+        '<p>기기를 '+esc(nm)+'님에게 넘긴 뒤<br>아래 버튼을 누르세요.</p>'+
+        '<span class="pill">'+(i+1)+' / '+state.n+'</span>'+
+      '</div>';
+    btn.textContent='내 카드 보기';
+    btn.className='btn';
+  }else{
+    body.innerHTML=roleCardHTML(i);
+    btn.textContent=(i+1>=state.n)?'확인했습니다 · 설명 시작':'확인했습니다 · 다음 사람에게';
+    btn.className='btn gold';
+  }
+}
+function roleCardHTML(i){
+  var isLiar=state.liars.indexOf(i)>=0;
+  var isSpy=(state.spy===i);
+  var head='<div class="cat">주제 · <b>'+esc(state.cat)+'</b></div>';
+  var h='';
+  if(isLiar&&state.mode==='fool'){
+    // 바보 모드: 시민과 똑같은 형식으로 '다른 제시어'
+    h='<div class="rcard">'+head+'<div class="word'+(state.fool.length>6?' small':'')+'">'+esc(state.fool)+'</div>'+
+      '<div class="note">이 제시어를 설명하세요.</div></div>';
+  }else if(isLiar){
+    h='<div class="rcard liar">'+head+'<div class="liarT">당신은 라이어입니다</div>'+
+      '<div class="note">제시어를 모릅니다. 다른 사람의 설명을 듣고 아는 척 연기하세요.'+
+      (state.liars.length>1?'<br>라이어는 총 '+state.liars.length+'명입니다.':'')+'</div></div>';
+  }else{
+    var spyLine='';
+    if(isSpy){
+      var ln=state.liars.map(function(k){return state.names[k];}).join(' · ');
+      spyLine='<div class="spy">🕶 당신은 스파이입니다<br>라이어: '+esc(ln)+'</div>'+
+        '<div class="note">라이어가 들키지 않게 은근히 도우세요. 라이어가 이기면 함께 이깁니다.</div>';
+    }
+    h='<div class="rcard">'+head+'<div class="word'+(state.word.length>6?' small':'')+'">'+esc(state.word)+'</div>'+spyLine+'</div>';
+  }
+  return h;
+}
+$('#revealBtn').onclick=function(){
+  if(!state)return;
+  if(!state.revealOpen){state.revealOpen=true;paintReveal();return;}
+  // 카드 내용을 즉시 비운 뒤 다음 사람으로 (화면에 정보가 남지 않게)
+  $('#revealBody').innerHTML='';
+  state.revealOpen=false;
+  state.revealPtr++;
+  if(state.revealPtr>=state.n)goDescribe();
+  else paintReveal();
+};
+
+/* ================= (3) 설명 라운드 ================= */
+function goDescribe(){
+  state.turn=0;
+  show('describe');
+  paintDescribe();
+}
+function paintDescribe(){
+  var n=state.n;
+  var lap=Math.floor(state.turn/n)+1;
+  var cur=state.order[state.turn%n];
+  $('#dsNow').textContent=state.names[cur];
+  $('#dsHint').innerHTML='<b>'+lap+'바퀴</b> / '+cfg.laps+'바퀴 · '+(state.turn+1)+'번째 발언<br>'+
+    '제시어를 한 문장으로 설명하세요. 너무 자세하면 라이어에게 들킵니다.';
+  var h='';
+  for(var t=0;t<state.totalTurns;t++){
+    var p=state.order[t%n];
+    var cls=(t===state.turn)?' now':(t<state.turn?' done':'');
+    h+='<div class="orow'+cls+'"><span class="no">'+(t+1)+'</span>'+
+      '<span class="n">'+esc(state.names[p])+'</span>'+
+      '<span class="s">'+(Math.floor(t/n)+1)+'바퀴</span></div>';
+  }
+  $('#dsOrder').innerHTML=h;
+  var last=(state.turn+1>=state.totalTurns);
+  $('#dsNext').textContent=last?'설명 끝 · 토론으로 →':'다음 사람 →';
+  if(cfg.turnLimit>0)startTimer(cfg.turnLimit,function(){nextDescribe();});
+  else stopTimer();
+  // 현재 발언자 행을 보이게
+  var nowEl=$('#dsOrder .orow.now');
+  if(nowEl&&nowEl.scrollIntoView)nowEl.scrollIntoView({block:'nearest'});
+}
+function nextDescribe(){
+  state.turn++;
+  if(state.turn>=state.totalTurns)goDebate();
+  else paintDescribe();
+}
+$('#dsNext').onclick=function(){if(state)nextDescribe();};
+
+/* ================= (4) 토론 ================= */
+function goDebate(){
+  show('debate');
+  if(cfg.debate>0){
+    startTimer(cfg.debate,function(){$('#dbBig').textContent='0:00';goVote(false);},$('#dbBig'));
+  }else{
+    stopTimer();$('#dbBig').textContent='∞';
+  }
+}
+$('#dbVote').onclick=function(){if(state)goVote(false);};
+
+/* ================= (5) 비밀 투표 ================= */
+function goVote(isRevote){
+  stopTimer();
+  state.votes=[];
+  state.votePtr=0;
+  state.votePick=-1;
+  state.voteOpen=false;
+  if(!isRevote)state.candidates=null;
+  show('vote');
+  paintVote();
+}
+function voteTargets(voter){
+  var list=[];
+  var base=state.candidates||state.names.map(function(_,i){return i;});
+  for(var k=0;k<base.length;k++){if(base[k]!==voter)list.push(base[k]);}
+  if(!list.length){ // 이론상 없음. 방어
+    for(var j=0;j<state.n;j++)if(j!==voter)list.push(j);
+  }
+  return list;
+}
+function paintVote(){
+  var i=state.votePtr,nm=state.names[i];
+  var body=$('#voteBody'),btn=$('#voteBtn');
+  if(!state.voteOpen){
+    body.innerHTML=
+      '<div class="cover">'+
+        '<div class="em">🗳</div>'+
+        '<h3><b>'+esc(nm)+'</b>님 차례입니다</h3>'+
+        '<p class="warn">다른 사람은 화면을 보지 마세요</p>'+
+        '<p>라이어로 의심되는 사람을 고릅니다.<br>선택은 개표 전까지 비밀입니다.</p>'+
+        '<span class="pill">'+(i+1)+' / '+state.n+'</span>'+
+      '</div>';
+    btn.textContent='투표하기';
+    btn.className='btn';
+    btn.disabled=false;
+  }else{
+    var tg=voteTargets(i);
+    var h='<div class="pan"><div class="lbl">'+esc(nm)+'님, 라이어는 누구일까요?</div>'+
+      (state.candidates?'<p class="lead">재투표 — 동률이었던 후보 중에서 고릅니다.</p>':'')+'</div>'+
+      '<div class="pan" style="flex:1;min-height:0;overflow-y:auto"><div class="picks">';
+    for(var k=0;k<tg.length;k++){
+      var p=tg[k];
+      h+='<button class="pick'+(state.votePick===p?' on':'')+'" data-p="'+p+'">'+
+        '<span class="mk"></span><span>'+esc(state.names[p])+'</span></button>';
+    }
+    h+='</div></div>';
+    body.innerHTML=h;
+    btn.textContent='투표 완료 · 다음 사람에게';
+    btn.className='btn gold';
+    btn.disabled=(state.votePick<0);
+  }
+}
+$('#voteBody').onclick=function(e){
+  var b=e.target.closest('.pick');if(!b||!state||!state.voteOpen)return;
+  state.votePick=parseInt(b.getAttribute('data-p'),10);
+  paintVote();
+};
+$('#voteBtn').onclick=function(){
+  if(!state)return;
+  if(!state.voteOpen){state.voteOpen=true;state.votePick=-1;paintVote();return;}
+  if(state.votePick<0)return;
+  state.votes[state.votePtr]=state.votePick;
+  $('#voteBody').innerHTML='';
+  state.voteOpen=false;state.votePick=-1;
+  state.votePtr++;
+  if(state.votePtr>=state.n)goTally();
+  else paintVote();
+};
+
+/* ================= (6) 개표 ================= */
+function goTally(){
+  stopTimer();
+  var counts=[],voters=[];
+  for(var i=0;i<state.n;i++){counts.push(0);voters.push([]);}
+  for(var v=0;v<state.n;v++){
+    var t=state.votes[v];
+    if(t===undefined||t===null)continue;
+    counts[t]++;voters[t].push(state.names[v]);
+  }
+  var max=0;
+  for(var k=0;k<state.n;k++)if(counts[k]>max)max=counts[k];
+  var top=[];
+  for(var m=0;m<state.n;m++)if(counts[m]===max&&max>0)top.push(m);
+
+  // 목록 렌더 (득표 순)
+  var rows=[];
+  for(var r=0;r<state.n;r++)rows.push({i:r,c:counts[r],f:voters[r]});
+  rows.sort(function(a,b){return b.c-a.c;});
+  $('#tlList').innerHTML=rows.map(function(o){
+    var isTop=(o.c===max&&max>0);
+    return '<div class="trow'+(isTop?' top':'')+'">'+
+      '<div class="th"><span class="n">'+esc(state.names[o.i])+'</span><span class="v">'+o.c+'표</span></div>'+
+      (o.f.length?'<div class="from">← '+esc(o.f.join(', '))+'</div>':'')+
+      '<div class="bar"><i style="width:'+(max?Math.round(o.c/max*100):0)+'%"></i></div>'+
+    '</div>';
+  }).join('');
+
+  show('tally');
+  var msg=$('#tlMsg'),btn=$('#tlNext');
+
+  if(top.length!==1){
+    // 동률
+    if(!state.revoted){
+      state.revoted=true;
+      state.candidates=top.slice();
+      msg.innerHTML='<b>동률입니다.</b> ('+top.map(function(i){return esc(state.names[i]);}).join(' · ')+')<br>'+
+        '이 후보들만 대상으로 <b>재투표 1회</b>를 진행합니다.';
+      btn.textContent='재투표 시작';
+      btn.onclick=function(){goVote(true);};
+    }else{
+      msg.innerHTML='<b>재투표도 동률입니다.</b><br>아무도 지목하지 못했으므로 <b>라이어의 승리</b>입니다.';
+      btn.textContent='결과 보기';
+      btn.onclick=function(){state.accused=-1;state.caught=false;goResult();};
+    }
+    return;
+  }
+
+  state.accused=top[0];
+  state.caught=(state.liars.indexOf(state.accused)>=0);
+  if(state.caught){
+    msg.innerHTML='<b>'+esc(state.names[state.accused])+'</b>님이 지목되었습니다.<br>'+
+      '이제 <b>라이어의 마지막 추리</b>가 남았습니다. 라이어가 제시어를 맞히면 역전승입니다.';
+    btn.textContent='라이어 추리로 →';
+    btn.onclick=function(){goGuess();};
+  }else{
+    msg.innerHTML='<b>'+esc(state.names[state.accused])+'</b>님이 지목되었습니다.<br>과연 라이어였을까요?';
+    btn.textContent='결과 보기';
+    btn.onclick=function(){goResult();};
+  }
+}
+
+/* ================= (7) 라이어 추리 ================= */
+function buildOptions(){
+  var pool=WORDS[state.cat].filter(function(w){return w!==state.word&&w!==state.fool;});
+  pool=shuffle(pool);
+  var need=Math.min(cfg.guessOpts,pool.length+1);
+  var opts=[state.word].concat(pool.slice(0,need-1));
+  return shuffle(opts);
+}
+function goGuess(){
+  stopTimer();
+  // 지목된 라이어를 먼저, 나머지 라이어가 있으면 그 뒤에
+  var q=[state.accused];
+  for(var i=0;i<state.liars.length;i++){
+    if(state.liars[i]!==state.accused)q.push(state.liars[i]);
+  }
+  state.guessQueue=q;
+  state.guessPtr=0;
+  state.guessOpen=false;
+  state.guessOptions=buildOptions();
+  state.guessPicks=[];
+  state.guessHit=false;
+  show('guess');
+  paintGuess();
+}
+function paintGuess(){
+  var i=state.guessQueue[state.guessPtr],nm=state.names[i];
+  var body=$('#guessBody'),btn=$('#guessBtn');
+  if(!state.guessOpen){
+    stopTimer();
+    body.innerHTML=
+      '<div class="cover">'+
+        '<div class="em">🎯</div>'+
+        '<h3><b>'+esc(nm)+'</b>님에게 기기를 넘기세요</h3>'+
+        '<p class="warn">라이어 본인만 보세요</p>'+
+        '<p>마지막 기회입니다. 제시어를 맞히면 역전승.</p>'+
+        (state.guessQueue.length>1?'<span class="pill">라이어 '+(state.guessPtr+1)+' / '+state.guessQueue.length+'</span>':'')+
+      '</div>';
+    btn.textContent='추리 시작';
+    btn.className='btn';
+    btn.disabled=false;
+  }else{
+    var foolNote=(state.mode==='fool')
+      ?'<p class="lead">사실 당신이 <b>라이어</b>였습니다. 보고 있던 <b>'+esc(state.fool)+'</b>'+josa(state.fool,'은','는')+' 가짜 제시어입니다.</p>':'';
+    var h='<div class="pan"><div class="lbl">주제 · <em>'+esc(state.cat)+'</em></div>'+
+      '<div class="pt">진짜 제시어는?</div>'+foolNote+'</div>'+
+      '<div class="pan" style="flex:1;min-height:0;overflow-y:auto"><div class="opts">';
+    for(var k=0;k<state.guessOptions.length;k++){
+      var w=state.guessOptions[k];
+      h+='<button class="opt'+(state.guessPick===w?' on':'')+'" data-w="'+esc(w)+'">'+esc(w)+'</button>';
+    }
+    h+='</div></div>';
+    body.innerHTML=h;
+    btn.textContent='이걸로 확정';
+    btn.className='btn gold';
+    btn.disabled=!state.guessPick;
+    if(cfg.guessTimer>0&&!tmr.id)startTimer(cfg.guessTimer,function(){submitGuess(true);});
+  }
+}
+$('#guessBody').onclick=function(e){
+  var b=e.target.closest('.opt');if(!b||!state||!state.guessOpen)return;
+  state.guessPick=b.getAttribute('data-w');
+  paintGuess();
+};
+$('#guessBtn').onclick=function(){
+  if(!state)return;
+  if(!state.guessOpen){state.guessOpen=true;state.guessPick=null;paintGuess();return;}
+  if(!state.guessPick)return;
+  submitGuess(false);
+};
+function submitGuess(timeout){
+  if(!state||!state.guessOpen)return;
+  stopTimer();
+  var who=state.guessQueue[state.guessPtr];
+  var pick=timeout?null:state.guessPick;
+  state.guessPicks.push({who:who,pick:pick});
+  if(pick===state.word)state.guessHit=true;
+  $('#guessBody').innerHTML='';
+  state.guessOpen=false;state.guessPick=null;
+  state.guessPtr++;
+  if(state.guessPtr>=state.guessQueue.length)goResult();
+  else paintGuess();
+}
+
+/* ================= (8) 결과 ================= */
+function goResult(){
+  stopTimer();
+  guard(false);
+  var caught=state.caught;
+  var hit=state.guessHit;
+  var outcome=!caught?'liarWin':(hit?'comeback':'citizenWin');
+
+  // 점수 계산
+  var gained={};
+  for(var i=0;i<state.n;i++)gained[i]=0;
+  var liarTeam=state.liars.slice();
+  if(state.spy>=0)liarTeam.push(state.spy);
+
+  if(outcome==='liarWin'){
+    liarTeam.forEach(function(i){gained[i]+=2;});
+  }else if(outcome==='comeback'){
+    liarTeam.forEach(function(i){gained[i]+=1;});
+  }else{
+    for(var c=0;c<state.n;c++){
+      if(liarTeam.indexOf(c)<0)gained[c]+=1;
+    }
+  }
+  // 라이어를 정확히 지목한 시민 보너스
+  if(caught){
+    for(var v=0;v<state.n;v++){
+      if(liarTeam.indexOf(v)>=0)continue;
+      if(state.votes[v]===state.accused)gained[v]+=1;
+    }
+  }
+  for(var k=0;k<state.n;k++){
+    var nm=state.names[k];
+    scores[nm]=(scores[nm]||0)+gained[k];
+  }
+  state.gained=gained;
+  saveStore();
+
+  // 렌더
+  var T=$('#rsTitle'),D=$('#rsDesc');
+  if(outcome==='liarWin'){
+    T.textContent='라이어 승리!';T.className='big liar';
+    D.innerHTML=(state.accused<0)
+      ?'투표가 끝내 갈렸습니다. 라이어는 끝까지 살아남았습니다.'
+      :'<b>'+esc(state.names[state.accused])+'</b>님은 라이어가 아니었습니다.';
+  }else if(outcome==='comeback'){
+    T.textContent='라이어 역전승!';T.className='big liar';
+    D.innerHTML='지목당했지만 제시어를 맞혔습니다.';
+  }else{
+    T.textContent='시민 승리!';T.className='big cit';
+    D.innerHTML='라이어를 찾아냈고, 제시어도 지켜냈습니다.';
+  }
+
+  var sub='';
+  if(state.mode==='fool')sub+='바보 모드 — 라이어에게는 <b>'+esc(state.fool)+'</b>'+josa(state.fool,'이','가')+' 보였습니다.<br>';
+  if(state.guessPicks.length){
+    sub+=state.guessPicks.map(function(g){
+      return esc(state.names[g.who])+'의 추리: <b>'+(g.pick?esc(g.pick):'시간 초과')+'</b>'+(g.pick===state.word?' ⭕':' ❌');
+    }).join('<br>');
+  }
+  $('#rsAnswer').innerHTML='<div class="k">주제 · '+esc(state.cat)+'</div>'+
+    '<div class="w">'+esc(state.word)+'</div>'+(sub?'<div class="sub">'+sub+'</div>':'');
+
+  $('#rsList').innerHTML=state.names.map(function(nm,i){
+    var isLiar=state.liars.indexOf(i)>=0,isSpy=(state.spy===i);
+    var role=isLiar?'라이어':(isSpy?'스파이':'시민');
+    var g=state.gained[i];
+    return '<li class="'+(isLiar?'isLiar':(isSpy?'isSpy':''))+'">'+
+      '<span class="n">'+esc(nm)+'</span>'+
+      '<span class="r">'+role+'</span>'+
+      '<span class="g'+(g?'':' zero')+'">'+(g?'+'+g:'0')+'</span></li>';
+  }).join('');
+  $('#rsScore').innerHTML=scoreHTML(state.names);
+
+  show('result');
+}
+$('#rsNext').onclick=function(){newRound(false);};
+$('#rsSetup').onclick=function(){
+  guard(false);stopTimer();state=null;round=0;
+  renderNames();renderCats();renderSegs();renderSetupScore();
+  show('setup');
+};
+
+/* ================= 시작 ================= */
+loadStore();
+renderNames();
+renderCats();
+renderSegs();
+renderSetupScore();
+show('setup');
+
+})();
+</script>
+</body>
+</html>
