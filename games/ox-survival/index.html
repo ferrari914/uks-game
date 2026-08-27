@@ -69,6 +69,71 @@
   .opt button{background:#0D0B14;border:1px solid var(--line);color:var(--mute);border-radius:10px;
     padding:9px 13px;font-size:13px;cursor:pointer;font-family:var(--body)}
   .opt button[aria-pressed=true]{border-color:var(--o);color:var(--o);background:#132723}
+  .opt.modes{display:flex;gap:8px;margin-bottom:6px}
+  .opt.modes button{flex:1;font-family:var(--disp);font-size:14.5px;letter-spacing:.03em;padding:13px 6px}
+  .opt.modes button[aria-pressed=true]{border-color:var(--gold);color:var(--gold);background:#2A2410}
+  .modedesc{margin:0 0 14px;font-size:12px;color:var(--mute);line-height:1.6}
+  .modedesc b{color:var(--paper)}
+  .chatlog{height:190px;overflow-y:auto;overscroll-behavior:contain;background:#0D0B14;
+    border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px}
+  .cmsg{display:flex;gap:6px;align-items:baseline;font-size:13px;line-height:1.45;
+    word-break:break-word;overflow-wrap:anywhere}
+  .cmsg .cav{flex:0 0 auto;font-size:15px}
+  .cmsg .cnm{flex:0 0 auto;color:var(--gold);font-weight:700;font-size:12px}
+  .cmsg .ctx{min-width:0}
+  .cempty{margin:auto;color:var(--mute);font-size:12.5px;text-align:center;line-height:1.6}
+  .chatin{display:flex;gap:8px;margin-top:10px}
+  .chatin input{flex:1;min-width:0}
+  .chatin .btn{flex:0 0 auto;font-size:14px;padding:0 20px}
+  .cmsg.mine .cnm{color:var(--o)}
+
+  /* 플로팅 채팅 (게임 중) */
+  .chatdock{display:none}
+  .chatdock.on{display:block}
+  .chatfab{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:82;
+    width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:var(--slab);
+    color:var(--paper);font-size:23px;line-height:1;cursor:pointer;padding:0;
+    box-shadow:0 8px 26px rgba(0,0,0,.55)}
+  .chatfab:active{transform:translateY(2px)}
+  .cbadge{position:absolute;top:-4px;right:-4px;min-width:21px;height:21px;padding:0 5px;
+    border-radius:99px;background:var(--x);color:#fff;font-family:var(--body);font-size:11px;
+    font-weight:700;line-height:21px;display:none}
+  .cbadge.show{display:block}
+  .chatpanel{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:440px;z-index:81;
+    background:var(--slab);border:1px solid var(--line);border-bottom:none;border-radius:18px 18px 0 0;
+    padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+    transform:translateY(112%);transition:transform .28s cubic-bezier(.3,1,.5,1);
+    box-shadow:0 -14px 44px rgba(0,0,0,.62)}
+  .chatpanel.open{transform:none}
+  .chathead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .chathead span{font-family:var(--disp);font-size:15px;letter-spacing:.06em}
+  .cx{background:transparent;border:1px solid var(--line);color:var(--mute);border-radius:9px;
+    width:30px;height:30px;font-size:13px;cursor:pointer;padding:0}
+  .chatpanel .chatlog{height:104px}
+  body.chatopen #app{padding-bottom:300px}
+  .chatpanel.open~.chatfab{opacity:0;pointer-events:none}
+  .chatfab{transition:opacity .2s}
+
+  /* 버전 정보 시트 */
+  .sheet{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+    padding:18px;background:rgba(8,6,14,.74)}
+  .sheet.show{display:flex}
+  .vcard{width:100%;max-width:460px;background:var(--slab);border:1px solid var(--line);
+    border-radius:18px;padding:16px}
+  .vhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .vhead h2{font-family:var(--disp);font-size:17px;margin:0;letter-spacing:.05em}
+  .verNow{margin:0 0 11px;font-size:12.5px;color:var(--mute);line-height:1.8}
+  .verNow b{color:var(--gold);font-size:20px;font-family:var(--disp);letter-spacing:.03em}
+  .verList{list-style:none;margin:0;padding:0;max-height:52vh;overflow-y:auto;overscroll-behavior:contain;
+    display:flex;flex-direction:column;gap:8px}
+  .verList>li{background:#0D0B14;border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+  .verList>li.cur{border-color:var(--gold);background:rgba(255,200,87,.07)}
+  .vh{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .vh b{font-family:var(--disp);font-size:14px;letter-spacing:.03em}
+  .vtag{font-family:var(--body);font-size:9px;font-weight:700;letter-spacing:.08em;color:#12101A;
+    background:var(--gold);border-radius:5px;padding:2px 6px}
+  .vitems p{margin:0;font-size:12px;line-height:1.75;color:var(--mute);
+    padding-left:11px;text-indent:-11px;word-break:keep-all}
   .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
   .qno{font-family:var(--disp);font-size:14px;letter-spacing:.16em;color:var(--gold)}
   .alivecnt{font-size:12px;color:var(--mute)}
@@ -188,6 +253,14 @@
   .rc .why{font-size:12.5px;color:var(--mute);line-height:1.45;margin-top:2px}
   .rc .qn{flex:0 0 auto;font-family:var(--disp);font-size:11px;letter-spacing:.1em;color:var(--x);
     border:1px solid rgba(255,77,109,.35);border-radius:99px;padding:4px 8px;background:rgba(255,77,109,.08)}
+  .rc.top{border-color:var(--gold);background:rgba(255,200,87,.07)}
+  .rc .rnk{flex:0 0 22px;text-align:center;font-family:var(--disp);font-size:15px;color:var(--mute)}
+  .rc.top .rnk{color:var(--gold)}
+  .rc .av.win{filter:none;opacity:1}
+  .rc .qn.sc{color:var(--gold);border-color:rgba(255,200,87,.35);background:rgba(255,200,87,.08)}
+  .rc .mez{font-size:10px;background:var(--gold);color:#12101A;border-radius:99px;padding:1px 6px;font-weight:700}
+  .rollcall h4.gold{color:var(--gold)}
+  .winner .wsc{margin-top:9px;font-size:13px;color:var(--gold);letter-spacing:.08em}
   @keyframes pop{0%{transform:scale(0) rotate(-40deg)}100%{transform:scale(1) rotate(0)}}
   .winner .ttl{font-family:var(--disp);font-size:15px;letter-spacing:.34em;color:var(--gold);margin:12px 0 4px}
   .winner .nm{font-family:var(--disp);font-size:clamp(26px,8vw,42px)}
@@ -326,7 +399,8 @@ var NET=window.__OXNET__||makeMqttNet();
 /* ================= 상태 ================= */
 var app=document.getElementById('app'),connBar=document.getElementById('conn');
 var S={screen:'home',name:'',emojiIdx:Math.floor(Math.random()*EMOJIS.length),code:'',pid:rid(8),
-  isHost:false,myChoice:null,offset:0,seenRound:null,err:'',net:'idle',lastState:0,fxRd:null,overKey:null};
+  isHost:false,myChoice:null,offset:0,seenRound:null,err:'',net:'idle',lastState:0,fxRd:null,overKey:null,
+  chat:[],unread:0,chatOpen:false,lastSent:0,chatSeen:{}};
 var REDUCED=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 var V=null,G=null,hostTimer=null,uiTimer=null,hbTimer=null;
 
@@ -338,6 +412,7 @@ function pickOne(a){return a[Math.floor(Math.random()*a.length)]}
 function T(){return 'oxdm5/'+S.code}
 function tState(){return T()+'/state'}
 function tEv(){return T()+'/ev'}
+function tChat(){return T()+'/chat'}
 function inviteLink(){return location.origin+location.pathname+'#'+S.code}
 
 /* ================= 홈 ================= */
@@ -362,7 +437,8 @@ function renderHome(){
   'style="text-transform:uppercase;flex:1.2" value="'+esc(pre)+'">'+
   '<button class="btn btn-o" id="jn" style="flex:1">입장</button></div>'+
   '<div class="err" id="er">'+esc(S.err)+'</div>'+
-  '<p class="note">공용 메시지 브로커를 통해 같은 방 참가자끼리 연결됩니다. 이름·캐릭터·선택은 같은 방 사람들에게 보이니 민감한 내용은 넣지 마세요.</p></div>';
+  '<p class="note">공용 메시지 브로커를 통해 같은 방 참가자끼리 연결됩니다. 이름·캐릭터·선택은 같은 방 사람들에게 보이니 민감한 내용은 넣지 마세요.</p></div>'+
+  '<button class="btn btn-ghost" id="verBtn" style="width:100%;margin-top:12px;font-size:13px;padding:12px">버전 v'+VERSION+'</button>';
 
   document.getElementById('eg').onclick=function(e){
     var b=e.target.closest('button');if(!b)return;S.emojiIdx=+b.dataset.i;
@@ -373,6 +449,7 @@ function renderHome(){
   document.getElementById('jn').onclick=joinRoom;
   if(document.getElementById('jn2'))document.getElementById('jn2').onclick=joinRoom;
   document.getElementById('cd').onkeydown=function(e){if(e.key==='Enter')joinRoom()};
+  document.getElementById('verBtn').onclick=openVer;
 }
 function fail(m){S.err=m;var e=document.getElementById('er');if(e)e.textContent=m}
 function setNet(s){
@@ -392,8 +469,10 @@ async function createRoom(){
   try{ await ensureNet() }catch(e){ fail('서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 다른 네트워크에서 열어보세요.'); return }
   S.code=rid(5); S.isHost=true;
   G={gameNo:0,phase:'lobby',round:null,qIndex:0,questions:[],endsAt:0,players:{},
-     question:null,answer:null,deaths:[],mercy:false,winner:null,qCount:10,timeLimit:12,allChoseAt:null,lastPub:0};
+     question:null,answer:null,deaths:[],mercy:false,winner:null,qCount:10,timeLimit:12,
+     mode:'survival',lastPub:0};
   NET.sub(tEv(),onEvent);
+  NET.sub(tChat(),onChat);
   addPlayer(S.pid,S.name,S.emojiIdx);
   startHost(); startHeartbeat();
   S.screen='lobby'; publish(true); render();
@@ -407,6 +486,7 @@ async function joinRoom(){
   try{ await ensureNet() }catch(e){ fail('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.'); return }
   S.code=c; S.isHost=false; S.lastState=0;
   NET.sub(tState(),onState);
+  NET.sub(tChat(),onChat);
   NET.pub(tEv(),{t:'join',pid:S.pid,name:S.name,em:S.emojiIdx});
   fail('방 찾는 중…');
   var waited=0;
@@ -421,12 +501,13 @@ function leaveRoom(){
   if(S.code){
     NET.pub(tEv(),{t:'leave',pid:S.pid});
     if(S.isHost)NET.pub(tState(),null,true);
-    NET.unsub(tState());NET.unsub(tEv());
+    NET.unsub(tState());NET.unsub(tEv());NET.unsub(tChat());
   }
   clearInterval(hostTimer);clearInterval(hbTimer);clearInterval(uiTimer);
   hostTimer=hbTimer=uiTimer=null;
   V=null;G=null;S.code='';S.isHost=false;S.myChoice=null;S.screen='home';S.err='';S.seenRound=null;
   S.fxRd=null;S.overKey=null;chEls={};
+  S.chat=[];S.unread=0;S.chatSeen={};closeChat();
   if(location.hash)history.replaceState(null,'',location.pathname);
   render();
 }
@@ -450,7 +531,7 @@ function addPlayer(pid,name,em){
   G.players[pid]={pid:pid,name:clean(name),emoji:EMOJIS[(+em||0)%EMOJIS.length],
     alive:G.phase==='lobby',choice:null,
     death:G.phase==='lobby'?null:'늦게 도착해서 관전 중 👀',
-    deadRound:G.phase==='lobby'?null:'-',zone:null,seen:Date.now()};
+    deadRound:G.phase==='lobby'?null:'-',zone:null,score:0,fell:false,seen:Date.now()};
   G.dirty=true;
 }
 function onEvent(m){
@@ -481,10 +562,7 @@ function hostTick(){
   }
   if(G.phase==='ready'){ if(t>=G.endsAt){startQuestion();G.dirty=true} }
   else if(G.phase==='question'){
-    var alive=[],i;for(i in G.players)if(G.players[i].alive)alive.push(G.players[i]);
-    var all=alive.length>0&&alive.every(function(p){return !!p.choice});
-    if(all){ if(!G.allChoseAt)G.allChoseAt=t } else G.allChoseAt=null;
-    if(t>=G.endsAt||(G.allChoseAt&&t-G.allChoseAt>1500)){resolveRound();G.dirty=true}
+    if(t>=G.endsAt){resolveRound();G.dirty=true}      // 제한시간 바가 다 닳아야 판정한다
   }
   else if(G.phase==='reveal'){ if(t>=G.endsAt){afterReveal();G.dirty=true} }
   if(G.dirty||t-G.lastPub>1200)publish();
@@ -492,26 +570,29 @@ function hostTick(){
 function startGame(){
   G.gameNo++; G.questions=shuffle(QUESTIONS).slice(0,G.qCount); G.qIndex=0;
   G.deaths=[]; G.winner=null; G.mercy=false;
-  for(var pid in G.players){var p=G.players[pid];p.alive=true;p.choice=null;p.death=null;p.deadRound=null;p.zone=null}
+  for(var pid in G.players){var p=G.players[pid];
+    p.alive=true;p.choice=null;p.death=null;p.deadRound=null;p.zone=null;p.score=0;p.fell=false}
   G.phase='ready'; G.endsAt=Date.now()+3400; G.dirty=true; publish(true);
 }
 function startQuestion(){
   var q=G.questions[G.qIndex];
   G.round=G.gameNo+'_'+(G.qIndex+1); G.question=q.q; G.answer=q.a;
-  G.deaths=[]; G.mercy=false; G.allChoseAt=null;
-  for(var pid in G.players){var p=G.players[pid];if(p.alive){p.choice=null;p.zone=null}}
+  G.deaths=[]; G.mercy=false;
+  for(var pid in G.players){var p=G.players[pid];p.fell=false;if(p.alive){p.choice=null;p.zone=null}}
   G.phase='question'; G.endsAt=Date.now()+G.timeLimit*1000; S.myChoice=null;
 }
 function resolveRound(){
-  var alive=[],pid;for(pid in G.players)if(G.players[pid].alive)alive.push(G.players[pid]);
-  var wrong=alive.filter(function(p){return p.choice!==G.answer});
-  G.deaths=[];
-  if(wrong.length===alive.length&&alive.length>1){ G.mercy=true }
-  else{
-    G.mercy=false;
+  var inplay=[],pid;for(pid in G.players)if(G.players[pid].alive)inplay.push(G.players[pid]);
+  var wrong=inplay.filter(function(p){return p.choice!==G.answer});
+  G.deaths=[];G.mercy=false;
+  inplay.forEach(function(p){if(p.choice===G.answer)p.score=(p.score||0)+1});
+  if(G.mode==='survival'&&wrong.length===inplay.length&&inplay.length>1){
+    G.mercy=true;                                  // 서바이벌에서 전원 오답이면 무효
+  }else{
     var pool=shuffle(DEATHS);
     wrong.forEach(function(p,i){
-      p.alive=false;
+      if(G.mode==='survival')p.alive=false;        // 점수전은 탈락 없이 다음 라운드에 복귀
+      p.fell=true;
       p.death=p.choice?pool[i%pool.length]:pickOne(TIMEOUT_DEATHS);
       p.deadRound=G.round;p.zone=p.choice||null;
       G.deaths.push({name:p.name,emoji:p.emoji,death:p.death});
@@ -522,8 +603,17 @@ function resolveRound(){
 function afterReveal(){
   var alive=[],pid;for(pid in G.players)if(G.players[pid].alive)alive.push(G.players[pid]);
   G.qIndex++;
-  if(alive.length<=1||G.qIndex>=G.questions.length){
-    G.winner=alive.map(function(p){return {name:p.name,emoji:p.emoji}});
+  var last=G.qIndex>=G.questions.length;
+  if(G.mode==='score'){                            // 점수전: 라운드를 다 채워야 끝난다
+    if(!last){G.phase='ready';G.endsAt=Date.now()+2600;return}
+    var best=-1;
+    alive.forEach(function(p){if((p.score||0)>best)best=p.score||0});
+    G.winner=alive.filter(function(p){return (p.score||0)===best})
+                  .map(function(p){return {name:p.name,emoji:p.emoji,score:p.score||0}});
+    G.phase='over';return;
+  }
+  if(alive.length<=1||last){                       // 서바이벌: 한 명 남거나 문제 소진
+    G.winner=alive.map(function(p){return {name:p.name,emoji:p.emoji,score:p.score||0}});
     G.phase='over';
   }else{ G.phase='ready'; G.endsAt=Date.now()+2600 }
 }
@@ -531,14 +621,137 @@ function publish(force){
   if(!G)return;
   G.dirty=false; G.lastPub=Date.now();
   var list=[];for(var pid in G.players){var p=G.players[pid];
-    list.push({pid:p.pid,name:p.name,emoji:p.emoji,alive:p.alive,choice:p.choice,death:p.death,dr:p.deadRound,zone:p.zone})}
+    list.push({pid:p.pid,name:p.name,emoji:p.emoji,alive:p.alive,choice:p.choice,death:p.death,
+               dr:p.deadRound,zone:p.zone,sc:p.score||0,fl:!!p.fell})}
   var v={ph:G.phase,rd:G.round,qi:G.qIndex,total:G.questions.length,q:G.question,
     ans:(G.phase==='reveal'||G.phase==='over')?G.answer:null,endsAt:G.endsAt,pub:Date.now(),
-    host:S.pid,mercy:G.mercy,deaths:G.deaths,winner:G.winner,tl:G.timeLimit,qc:G.qCount,players:list};
+    host:S.pid,mercy:G.mercy,deaths:G.deaths,winner:G.winner,tl:G.timeLimit,qc:G.qCount,
+    mode:G.mode,players:list};
   V=v;S.offset=0;S.lastState=Date.now();
   NET.pub(tState(),v,true);
   applyView();
 }
+
+/* ================= 채팅 (전용 토픽 · 대기실/게임 중 공용) ================= */
+function onChat(m){
+  if(!m||typeof m.x!=='string'||!m.pid)return;
+  var now=Date.now(),last=S.chatSeen[m.pid]||0;
+  if(now-last<250)return;                              // 수신 측 최소 간격
+  S.chatSeen[m.pid]=now;
+  pushChat({id:String(m.id||'').slice(0,8),pid:String(m.pid).slice(0,8),
+            n:clean(m.n),e:String(m.e||'💬').slice(0,4),
+            x:String(m.x).replace(/\s+/g,' ').trim().slice(0,80)});
+}
+function pushChat(m){
+  if(!m.x)return;
+  for(var i=0;i<S.chat.length;i++)if(S.chat[i].id===m.id)return;   // 내 메시지 에코 중복 제거
+  S.chat.push(m);
+  if(S.chat.length>30)S.chat.shift();
+  if(m.pid!==S.pid&&!chatVisible())S.unread++;
+  paintChat();
+}
+function chatVisible(){return S.screen==='lobby'||S.chatOpen}
+function sendChat(inp){
+  if(!inp||!S.code)return;
+  var t=inp.value.replace(/\s+/g,' ').trim().slice(0,80);
+  if(!t)return;
+  var now=Date.now();
+  if(now-S.lastSent<600)return;                        // 도배 방지
+  S.lastSent=now; inp.value='';
+  var m={id:rid(6),pid:S.pid,n:S.name,e:EMOJIS[S.emojiIdx%EMOJIS.length],x:t};
+  pushChat(m);                                         // 내 화면에는 즉시
+  NET.pub(tChat(),m);
+}
+function paintChat(){
+  var boxes=document.querySelectorAll('.chatlog');
+  var key=S.chat.length+'|'+(S.chat.length?S.chat[S.chat.length-1].id:'');
+  for(var i=0;i<boxes.length;i++){
+    var b=boxes[i];
+    if(b.getAttribute('data-k')===key)continue;        // 내용 그대로면 다시 그리지 않는다
+    b.setAttribute('data-k',key);
+    b.innerHTML=S.chat.length?S.chat.map(function(c){
+      return '<div class="cmsg'+(c.pid===S.pid?' mine':'')+'"><span class="cav">'+esc(c.e)+'</span>'+
+             '<span class="cnm">'+esc(c.n)+'</span><span class="ctx">'+esc(c.x)+'</span></div>'}).join('')
+      :'<div class="cempty">아직 메시지가 없습니다. 먼저 인사해 보세요 👋</div>';
+    b.scrollTop=b.scrollHeight;
+  }
+  paintDock();
+}
+function paintDock(){
+  var dock=document.getElementById('cdock');if(!dock)return;
+  var show=!!S.code&&S.screen!=='home'&&S.screen!=='lobby';   // 대기실은 카드가 따로 있다
+  dock.classList.toggle('on',show);
+  if(!show&&S.chatOpen)closeChat();
+  var bd=document.getElementById('cbadge');
+  if(bd){bd.textContent=S.unread>9?'9+':String(S.unread);bd.classList.toggle('show',S.unread>0)}
+}
+function openChat(){
+  S.chatOpen=true;S.unread=0;
+  document.body.classList.add('chatopen');      // 문제가 길어 O·X가 가려져도 스크롤로 올릴 수 있게
+  var pn=document.getElementById('cpanel');if(pn)pn.classList.add('open');
+  var lg=document.getElementById('dlog');if(lg)lg.scrollTop=lg.scrollHeight;
+  paintDock();
+  var it=document.getElementById('dmsg');if(it)setTimeout(function(){it.focus()},80);
+}
+function closeChat(){
+  S.chatOpen=false;document.body.classList.remove('chatopen');
+  var pn=document.getElementById('cpanel');if(pn)pn.classList.remove('open');
+  paintDock();
+}
+function toggleChat(){S.chatOpen?closeChat():openChat()}
+
+/* ================= 버전 정보 ================= */
+var VERSION='1.3.0';
+var CHANGELOG=[
+ {v:'1.3.0',t:['게임 중에도 채팅할 수 있는 플로팅 채팅창 추가 (안 읽은 메시지 수 표시)',
+               '채팅을 방장 경유가 아닌 전용 채널로 분리해 지연을 줄임',
+               '버전 정보 버튼 추가']},
+ {v:'1.2.0',t:['게임 방식 2종 분리 — 서바이벌(마지막 한 명) / 점수전(최다 정답자)',
+               '점수전은 틀려도 다음 라운드에 복귀하고, 끝나면 전원 순위표를 보여줌',
+               '대기실 채팅 추가',
+               '제한시간 바가 다 닳기도 전에 정답이 공개되던 문제 수정']},
+ {v:'1.1.0',t:['발판 붕괴 연출 고도화 — 균열 → 두 조각으로 갈라짐 → 파편 낙하 + 화면 흔들림',
+               '탈락 캐릭터가 심연으로 떨어지며 사망 사유를 말풍선으로 남김',
+               '게임오버 화면에 우승 색종이와 탈락자 명단 등장 연출 추가']},
+ {v:'1.0.0',t:['OX 서바이벌 첫 공개',
+               '방 코드·초대 링크로 접속하는 실시간 멀티플레이 (공용 MQTT 브로커)',
+               '문제 수·제한시간 설정, 틀린 쪽 발판이 무너지는 OX 서바이벌']}
+];
+function openVer(){
+  var sh=document.getElementById('verSheet');if(!sh)return;
+  document.getElementById('verNow').textContent='v'+VERSION;
+  document.getElementById('verList').innerHTML=CHANGELOG.map(function(c,i){
+    return '<li'+(i===0?' class="cur"':'')+'><div class="vh"><b>v'+c.v+'</b>'+
+      (i===0?'<span class="vtag">NOW</span>':'')+'</div><div class="vitems">'+
+      c.t.map(function(x){return '<p>· '+esc(x)+'</p>'}).join('')+'</div></li>';
+  }).join('');
+  sh.classList.add('show');
+}
+function closeVer(){var sh=document.getElementById('verSheet');if(sh)sh.classList.remove('show')}
+
+/* 앱 다시 그려도 살아남도록 body에 한 번만 만든다 */
+(function buildOverlays(){
+  var d=document.createElement('div');d.className='chatdock';d.id='cdock';
+  d.innerHTML='<div class="chatpanel" id="cpanel">'+
+    '<div class="chathead"><span>채팅</span><button class="cx" id="cclose" aria-label="닫기">✕</button></div>'+
+    '<div class="chatlog" id="dlog"></div>'+
+    '<div class="chatin"><input type="text" id="dmsg" maxlength="80" placeholder="메시지 (80자까지)" autocomplete="off">'+
+    '<button class="btn btn-o" id="dsend">전송</button></div></div>'+
+    '<button class="chatfab" id="cfab" aria-label="채팅 열기">💬<span class="cbadge" id="cbadge"></span></button>';
+  document.body.appendChild(d);
+  document.getElementById('cfab').onclick=toggleChat;
+  document.getElementById('cclose').onclick=closeChat;
+  document.getElementById('dsend').onclick=function(){sendChat(document.getElementById('dmsg'))};
+  document.getElementById('dmsg').onkeydown=function(e){if(e.key==='Enter')sendChat(document.getElementById('dmsg'))};
+
+  var v=document.createElement('div');v.className='sheet';v.id='verSheet';
+  v.innerHTML='<div class="vcard"><div class="vhead"><h2>버전 정보</h2>'+
+    '<button class="cx" id="verClose" aria-label="닫기">✕</button></div>'+
+    '<p class="verNow">현재 버전 <b id="verNow">-</b></p><ol class="verList" id="verList"></ol></div>';
+  document.body.appendChild(v);
+  document.getElementById('verClose').onclick=closeVer;
+  v.onclick=function(e){if(e.target===v)closeVer()};
+})();
 
 /* ================= 화면 ================= */
 function applyView(){
@@ -551,10 +764,11 @@ function applyView(){
   else if(S.screen==='over')render();
 }
 function render(){
-  if(S.screen==='home')return renderHome();
-  if(S.screen==='lobby')return renderLobby();
-  if(S.screen==='game')return renderGame();
-  if(S.screen==='over')return renderOver();
+  if(S.screen==='home')renderHome();
+  else if(S.screen==='lobby')renderLobby();
+  else if(S.screen==='game')renderGame();
+  else if(S.screen==='over')renderOver();
+  paintChat();
 }
 
 function renderLobby(){
@@ -565,13 +779,19 @@ function renderLobby(){
   '<button class="btn btn-ghost" id="cp2" style="font-size:13px;padding:10px 12px">코드만 복사</button></div></div>'+
   '<div class="card"><h3>참가자 <span id="pc" style="color:var(--mute)"></span></h3><div class="players" id="pl"></div></div>'+
   '<div class="card" id="hostbox"></div>'+
+  '<div class="card"><h3>대기실 채팅</h3><div class="chatlog" id="clog"></div>'+
+  '<div class="chatin"><input type="text" id="cmsg" maxlength="80" placeholder="메시지 (80자까지)" autocomplete="off">'+
+  '<button class="btn btn-o" id="csend">전송</button></div></div>'+
   '<button class="btn btn-ghost" id="lv" style="width:100%;margin-top:12px;font-size:14px">방 나가기</button>'+
   '<p class="note">방장이 나가면 방이 닫힙니다. 게임 도중 들어온 사람은 관전하다가 다음 판부터 참가합니다.</p>';
   document.getElementById('lv').onclick=leaveRoom;
   document.getElementById('cp').onclick=function(e){copy(inviteLink(),e.target,'초대 링크 복사')};
   document.getElementById('cp2').onclick=function(e){copy(S.code,e.target,'코드만 복사')};
+  document.getElementById('csend').onclick=function(){sendChat(document.getElementById('cmsg'))};
+  document.getElementById('cmsg').onkeydown=function(e){if(e.key==='Enter')sendChat(document.getElementById('cmsg'))};
   paintLobby();
 }
+
 function copy(txt,btn,orig){
   var done=function(){btn.textContent='복사했어요';setTimeout(function(){btn.textContent=orig},1800)};
   if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -594,18 +814,31 @@ function paintLobby(){
   }).join('');
   var hb=document.getElementById('hostbox');
   if(S.isHost){
-    hb.innerHTML='<h3>게임 설정</h3><label class="lbl">문제 수</label><div class="opt" id="qc">'+
-      [5,10,15,20].map(function(n){return '<button data-v="'+n+'" aria-pressed="'+(G.qCount===n)+'">'+n+'문제</button>'}).join('')+
+    var surv=G.mode==='survival',unit=surv?'문제':'라운드';
+    hb.innerHTML='<h3>게임 설정</h3><label class="lbl">게임 방식</label><div class="opt modes" id="md">'+
+      '<button data-v="survival" aria-pressed="'+surv+'">🕳️ 서바이벌</button>'+
+      '<button data-v="score" aria-pressed="'+(!surv)+'">🏅 점수전</button></div>'+
+      '<p class="modedesc">'+(surv
+        ?'틀리면 그 자리에서 <b>탈락</b>. 마지막 한 명이 우승합니다.'
+        :'틀려도 다음 라운드에 <b>복귀</b>. 정해진 라운드 동안 가장 많이 맞힌 사람이 우승합니다.')+'</p>'+
+      '<label class="lbl">'+(surv?'문제 수':'라운드 수')+'</label><div class="opt" id="qc">'+
+      [5,10,15,20].map(function(n){return '<button data-v="'+n+'" aria-pressed="'+(G.qCount===n)+'">'+n+unit+'</button>'}).join('')+
       '</div><label class="lbl">문제당 제한시간</label><div class="opt" id="tl">'+
       [8,12,15,20].map(function(n){return '<button data-v="'+n+'" aria-pressed="'+(G.timeLimit===n)+'">'+n+'초</button>'}).join('')+
       '</div><button class="btn btn-gold" id="go" style="width:100%">게임 시작</button>';
+    hb.querySelector('#md').onclick=function(e){var b=e.target.closest('button');if(!b)return;
+      G.mode=b.dataset.v;G.dirty=true;paintLobby()};
     hb.querySelector('#qc').onclick=function(e){var b=e.target.closest('button');if(!b)return;G.qCount=+b.dataset.v;paintLobby()};
     hb.querySelector('#tl').onclick=function(e){var b=e.target.closest('button');if(!b)return;G.timeLimit=+b.dataset.v;paintLobby()};
     hb.querySelector('#go').onclick=function(){startGame()};
   }else{
     hb.innerHTML='<h3>대기 중</h3><p style="margin:0;color:var(--mute);font-size:13.5px;line-height:1.6">'+
-      '방장이 시작하면 바로 첫 문제가 나옵니다. 준비되면 손가락을 O·X 위에 올려두세요.</p>';
+      (V.mode==='score'?'<b style="color:var(--gold)">🏅 점수전</b> — 틀려도 계속 참여하고, 가장 많이 맞힌 사람이 우승합니다.'
+                       :'<b style="color:var(--gold)">🕳️ 서바이벌</b> — 틀리면 즉시 탈락, 마지막 한 명이 우승합니다.')+
+      '<br>방장이 시작하면 바로 첫 문제가 나옵니다.</p>';
   }
+
+  paintChat();
 }
 
 function renderGame(){
@@ -631,8 +864,15 @@ var chEls={};
 function paintGame(){
   if(!V||!document.getElementById('qt'))return;
   var aliveN=V.players.filter(function(p){return p.alive}).length;
-  document.getElementById('qno').textContent=V.ph==='ready'?'준비':'Q '+(V.qi+1)+' / '+V.total;
-  document.getElementById('ac').textContent='생존 '+aliveN+'명';
+  var scoreMode=V.mode==='score';
+  document.getElementById('qno').textContent=V.ph==='ready'?'준비'
+    :(scoreMode?'R ':'Q ')+(V.qi+1)+' / '+V.total;
+  var acEl=document.getElementById('ac');
+  if(scoreMode){
+    var mySc=null,topSc=0;
+    V.players.forEach(function(p){if(p.pid===S.pid)mySc=p.sc||0;if((p.sc||0)>topSc)topSc=p.sc||0});
+    acEl.textContent=(mySc===null?'':'내 점수 '+mySc+' · ')+'최고 '+topSc+'점';
+  }else acEl.textContent='생존 '+aliveN+'명';
   document.getElementById('qt').textContent=V.ph==='ready'?'다음 문제 준비…':(V.q||'');
 
   setSlabFx();
@@ -658,7 +898,7 @@ function paintGame(){
       el.classList.toggle('me',p.pid===S.pid);
       var pos=slot(i,z,g[z].length);
       el.style.left=pos.x+'%';el.style.top=pos.y+'%';
-      var dying=!p.alive&&p.dr===V.rd;
+      var dying=(!p.alive||p.fl)&&p.dr===V.rd;
       el.classList.toggle('dying',dying);
       if(dying&&p.death){el.querySelector('.bub').textContent=p.death;el.classList.add('showbub')}
       else el.classList.remove('showbub');
@@ -675,16 +915,26 @@ function paintGame(){
 
   var sb=document.getElementById('sb');
   if(V.ph==='ready')sb.innerHTML='곧 문제가 나옵니다.';
-  else if(V.ph==='question')sb.innerHTML=!me?'관전 중':(!me.alive?'이미 탈락했어요. 남은 친구들을 응원하세요 👀'
-    :(mine?'<b>'+mine+'</b> 발판 위에 서 있습니다. 시간 안에 바꿀 수 있어요.':'O 또는 X를 고르세요'));
-  else if(V.ph==='reveal')sb.innerHTML=V.mercy?'전원 오답! 심판이 봐줬습니다. 이번 라운드는 <b>무효</b>':'정답은 <b>'+V.ans+'</b>';
+  else if(V.ph==='question'){
+    if(!me)sb.innerHTML='관전 중';
+    else if(!me.alive)sb.innerHTML='이미 탈락했어요. 남은 친구들을 응원하세요 👀';
+    else if(!mine)sb.innerHTML='O 또는 X를 고르세요';
+    else{
+      var allPicked=V.players.filter(function(p){return p.alive}).every(function(p){return !!p.choice});
+      sb.innerHTML=allPicked
+        ?'모두 골랐습니다. <b>시간이 다 되면</b> 공개돼요 — 그전까진 바꿀 수 있어요.'
+        :'<b>'+mine+'</b> 발판 위에 서 있습니다. 시간 안에 바꿀 수 있어요.';
+    }
+  }
+  else if(V.ph==='reveal')sb.innerHTML=V.mercy?'전원 오답! 심판이 봐줬습니다. 이번 라운드는 <b>무효</b>'
+    :'정답은 <b>'+V.ans+'</b>'+(scoreMode?' — 맞힌 사람은 <b>+1점</b>':'');
 
   var dz=document.getElementById('dz');
   if(V.ph==='reveal'&&V.deaths&&V.deaths.length){
     var dk=V.rd+'|'+V.deaths.length;
     if(dz.getAttribute('data-k')!==dk){          // 매 publish마다 다시 그리면 애니메이션이 끊긴다
       dz.setAttribute('data-k',dk);
-      dz.innerHTML='<div class="deaths"><h4>이번 라운드 탈락 '+V.deaths.length+'명</h4><ul>'+
+      dz.innerHTML='<div class="deaths"><h4>'+(scoreMode?'이번 라운드 오답 ':'이번 라운드 탈락 ')+V.deaths.length+'명</h4><ul>'+
         V.deaths.slice(0,7).map(function(d,i){return '<li style="--i:'+i+'"><b>'+d.emoji+' '+esc(d.name)+
           '</b> <span>— '+esc(d.death)+'</span></li>'}).join('')+
         (V.deaths.length>7?'<li style="--i:7"><span>그 외 '+(V.deaths.length-7)+'명…</span></li>':'')+'</ul></div>';
@@ -823,22 +1073,52 @@ function renderOver(){
   var key='over|'+(V.rd||'')+'|'+((V.winner||[]).length);
   if(S.overKey===key&&document.getElementById('lv2'))return;   // 재발행마다 애니메이션 재생 방지
   S.overKey=key;
-  var w=V.winner||[];
-  var body=w.length===0?'<div class="av">🪦</div><div class="ttl">전 원 탈 락</div><div class="nm">생존자 없음</div>'
-   :w.length===1?'<div class="av">'+w[0].emoji+'</div><div class="ttl">최 후 의 생 존 자</div><div class="nm">'+esc(w[0].name)+'</div>'
-   :'<div class="av">🏆</div><div class="ttl">공 동 우 승 '+w.length+'명</div><div class="nm">'+
-     w.map(function(p){return p.emoji+' '+esc(p.name)}).join('  ')+'</div>';
-  var dead=V.players.filter(function(p){return !p.alive});
-  dead.sort(function(a,b){return drOrder(a.dr)-drOrder(b.dr)});     // 먼저 죽은 순서대로 등장
-  app.innerHTML='<div class="winner" id="wcard"><div class="shine"></div>'+body+'</div>'+
-   (dead.length?'<div class="rollcall"><h4>탈락자 명단</h4>'+
-     dead.map(function(p,i){
-       var qn=qLabel(p.dr);
-       return '<div class="rc" style="--i:'+i+'"><div class="av">'+p.emoji+'</div>'+
-         '<div class="txt"><div class="who">'+esc(p.name)+'</div>'+
-         '<div class="why">'+esc(p.death||'중도 퇴장')+'</div></div>'+
-         (qn?'<div class="qn">'+qn+'</div>':'')+'</div>';
-     }).join('')+'</div>':'')+
+  var w=V.winner||[],scoreMode=V.mode==='score';
+  var body;
+  if(scoreMode){
+    var ws=w.length?(w[0].score||0):0;
+    body=w.length===0?'<div class="av">🤷</div><div class="ttl">무 승 부</div><div class="nm">참가자 없음</div>'
+     :w.length===1?'<div class="av">'+w[0].emoji+'</div><div class="ttl">우 승</div><div class="nm">'+esc(w[0].name)+'</div>'+
+        '<div class="wsc">'+ws+'문제 정답</div>'
+     :'<div class="av">🏆</div><div class="ttl">공 동 우 승 '+w.length+'명</div><div class="nm">'+
+        w.map(function(p){return p.emoji+' '+esc(p.name)}).join('  ')+'</div><div class="wsc">'+ws+'문제 정답</div>';
+  }else{
+    body=w.length===0?'<div class="av">🪦</div><div class="ttl">전 원 탈 락</div><div class="nm">생존자 없음</div>'
+     :w.length===1?'<div class="av">'+w[0].emoji+'</div><div class="ttl">최 후 의 생 존 자</div><div class="nm">'+esc(w[0].name)+'</div>'
+     :'<div class="av">🏆</div><div class="ttl">공 동 우 승 '+w.length+'명</div><div class="nm">'+
+        w.map(function(p){return p.emoji+' '+esc(p.name)}).join('  ')+'</div>';
+  }
+
+  var listHtml='';
+  if(scoreMode){                                   // 점수전: 전원 순위표 (동점은 같은 등수)
+    var rank=V.players.slice().sort(function(a,b){return (b.sc||0)-(a.sc||0)});
+    var prevSc=null,prevRank=0;
+    listHtml='<div class="rollcall"><h4 class="gold">최종 순위</h4>'+
+      rank.map(function(pl,i){
+        var sc=pl.sc||0;
+        if(sc!==prevSc){prevRank=i+1;prevSc=sc}
+        var first=prevRank===1;
+        return '<div class="rc'+(first?' top':'')+'" style="--i:'+i+'">'+
+          '<div class="rnk">'+prevRank+'</div>'+
+          '<div class="av'+(first?' win':'')+'">'+pl.emoji+'</div>'+
+          '<div class="txt"><div class="who">'+esc(pl.name)+
+            (pl.pid===S.pid?' <span class="mez">나</span>':'')+'</div></div>'+
+          '<div class="qn sc">'+sc+'점</div></div>';
+      }).join('')+'</div>';
+  }else{                                           // 서바이벌: 탈락자 명단
+    var dead=V.players.filter(function(pl){return !pl.alive});
+    dead.sort(function(a,b){return drOrder(a.dr)-drOrder(b.dr)});   // 먼저 죽은 순서대로 등장
+    if(dead.length)listHtml='<div class="rollcall"><h4>탈락자 명단</h4>'+
+      dead.map(function(pl,i){
+        var qn=qLabel(pl.dr);
+        return '<div class="rc" style="--i:'+i+'"><div class="av">'+pl.emoji+'</div>'+
+          '<div class="txt"><div class="who">'+esc(pl.name)+'</div>'+
+          '<div class="why">'+esc(pl.death||'중도 퇴장')+'</div></div>'+
+          (qn?'<div class="qn">'+qn+'</div>':'')+'</div>';
+      }).join('')+'</div>';
+  }
+
+  app.innerHTML='<div class="winner" id="wcard"><div class="shine"></div>'+body+'</div>'+listHtml+
    '<div class="row" style="margin-top:16px">'+
    (S.isHost?'<button class="btn btn-gold" id="again">한 판 더</button>':'')+
    '<button class="btn btn-ghost" id="lv2">방 나가기</button></div>'+
