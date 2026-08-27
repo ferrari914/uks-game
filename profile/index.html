@@ -480,26 +480,43 @@
   let activeTab = TABS[0].id;
 
   /* ===== 렌더링 ===== */
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
-    c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  // 치환표는 최초 1회만 만든다 (호출마다 객체를 새로 만들지 않도록)
+  const ESC = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ESC[c]);
+
+  // 자주 쓰는 요소는 한 번만 찾아 둔다
+  const avatarEl = document.getElementById('avatar');
+  const tabsEl   = document.getElementById('tabs');
+  const panelEl  = document.getElementById('panel');
 
   function renderAvatar() {
-    document.getElementById('avatar').innerHTML = avatarSVG();
+    avatarEl.innerHTML = avatarSVG();
   }
 
-  function renderTabs() {
-    document.getElementById('tabs').innerHTML = TABS.map(t => `
+  // 탭 버튼은 목록이 고정이라 최초 1회만 만든다.
+  function buildTabs() {
+    tabsEl.innerHTML = TABS.map(t => `
       <button class="pf-tab" type="button" role="tab" id="tab-${t.id}"
               aria-controls="panel" data-tab="${t.id}"
               aria-selected="${t.id === activeTab}"
               tabindex="${t.id === activeTab ? '0' : '-1'}">${esc(t.label)}</button>`).join('');
   }
 
+  // 탭을 옮길 때는 버튼을 다시 만들지 않고 선택 상태만 맞춘다.
+  // (버튼이 살아 있으므로 이어지는 focus() 도 그대로 동작한다)
+  function syncTabs() {
+    tabsEl.querySelectorAll('.pf-tab').forEach(b => {
+      const on = b.dataset.tab === activeTab;
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1;
+    });
+  }
+
   function renderPanel() {
     const tab = TABS.find(t => t.id === activeTab);
-    document.getElementById('panel').setAttribute('aria-labelledby', 'tab-' + tab.id);
+    panelEl.setAttribute('aria-labelledby', 'tab-' + tab.id);
 
-    document.getElementById('panel').innerHTML = tab.groups.map(g => {
+    panelEl.innerHTML = tab.groups.map(g => {
       if (g.colors) {
         return `<div class="pf-section"><h2>${esc(g.title)}</h2><div class="pf-colors">`
           + g.colors.map(c => `
@@ -518,33 +535,55 @@
     }).join('');
   }
 
-  function renderAll() { renderTabs(); renderPanel(); renderAvatar(); }
+  function renderAll() { buildTabs(); renderPanel(); renderAvatar(); }
 
   /* ===== 이벤트 ===== */
-  document.getElementById('tabs').addEventListener('click', e => {
+  tabsEl.addEventListener('click', e => {
     const btn = e.target.closest('.pf-tab');
     if (!btn) return;
     activeTab = btn.dataset.tab;
-    renderTabs(); renderPanel();
+    syncTabs(); renderPanel();
     document.getElementById('tab-' + activeTab).focus();
   });
 
   // 탭 목록은 좌우 방향키로도 이동할 수 있어야 한다
-  document.getElementById('tabs').addEventListener('keydown', e => {
+  tabsEl.addEventListener('keydown', e => {
     const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     if (!dir) return;
     e.preventDefault();
     const i = TABS.findIndex(t => t.id === activeTab);
     activeTab = TABS[(i + dir + TABS.length) % TABS.length].id;
-    renderTabs(); renderPanel();
+    syncTabs(); renderPanel();
     document.getElementById('tab-' + activeTab).focus();
   });
 
-  document.getElementById('panel').addEventListener('click', e => {
+  panelEl.addEventListener('click', e => {
     const btn = e.target.closest('[data-key]');
     if (!btn) return;
-    state[btn.dataset.key] = btn.dataset.val;
-    renderPanel(); renderAvatar(); save();
+    const key = btn.dataset.key;
+    state[key] = btn.dataset.val;
+
+    // 스타일 미리보기는 현재 "색상"으로 그려진다. 따라서 색상을 고른 경우에만
+    // 패널을 다시 만들면 되고, 스타일을 고른 경우에는 선택 표시만 바꾸면 된다.
+    // (기존에는 어느 쪽이든 패널 전체와 미리보기 SVG를 통째로 다시 조립했다)
+    if (btn.classList.contains('pf-color')) {
+      // 패널을 다시 만들면 방금 누른 버튼이 사라져 포커스가 <body>로 떨어진다.
+      // 스타일 쪽은 재생성을 안 하므로 포커스가 유지되는데, 색상 쪽만
+      // 풀리면 키보드 조작이 들쭉날쭉해진다. 같은 자리로 되돌려 맞춘다.
+      const hadFocus = document.activeElement === btn;
+      const val = btn.dataset.val;
+      renderPanel();
+      if (hadFocus) {
+        const again = panelEl.querySelector(
+          '[data-key="' + key + '"][data-val="' + val + '"]');
+        if (again) again.focus();
+      }
+    } else {
+      btn.parentElement.querySelectorAll('[data-key="' + key + '"]')
+        .forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    }
+
+    renderAvatar(); save();
   });
 
   const nickname = document.getElementById('nickname');

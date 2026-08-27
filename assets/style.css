@@ -76,6 +76,9 @@ body::before {
 }
 .skip:focus { top: var(--s4); }
 
+/* 카드·프로필 진입점의 화살표가 공유하는 전환 (개별 규칙으로 중복 선언하지 않는다) */
+.arrow { transition: transform .2s; }
+
 /* 키보드 포커스는 모든 조작 요소에서 보이게 */
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -150,7 +153,7 @@ header { padding: var(--s8) 0 var(--s6); text-align: center; }
 .profile-text { display: flex; flex-direction: column; line-height: 1.35; }
 .profile-text b { font-size: 15px; font-weight: 800; }
 .profile-text span { font-size: 12px; color: var(--muted); }
-.profile-link .arrow { color: var(--accent); font-weight: 700; transition: transform .2s; }
+.profile-link .arrow { color: var(--accent); font-weight: 700; }
 .profile-link:hover .arrow,
 .profile-link:focus-visible .arrow { transform: translateX(4px); }
 
@@ -283,7 +286,6 @@ a.card:focus-visible {
 .card.locked .play { color: var(--muted); }
 a.card:hover .play .arrow,
 a.card:focus-visible .play .arrow { transform: translateX(4px); }
-.play .arrow { transition: transform .2s; }
 
 /* ===== 빈 상태 / 푸터 ===== */
 .empty {
@@ -335,8 +337,9 @@ footer {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
-  a.card:hover, a.card:focus-visible { transform: none; }
-  a.card:hover .play .arrow, a.card:focus-visible .play .arrow { transform: none; }
-  .profile-link:hover, .profile-link:focus-visible { transform: none; }
+  /* 전환 시간만 줄이면 hover 상태의 transform은 그대로 적용되므로 따로 끈다 */
+  a.card:hover, a.card:focus-visible,
+  a.card:hover .arrow, a.card:focus-visible .arrow,
+  .profile-link:hover, .profile-link:focus-visible,
   .profile-link:hover .arrow, .profile-link:focus-visible .arrow { transform: none; }
 }

@@ -70,8 +70,9 @@
   let tagFilter = ALL;
 
   // 데이터가 그대로 HTML로 들어가므로 항상 이스케이프한다.
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
-    c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  // 치환표는 모듈 최초 1회만 만든다 (호출마다 객체를 새로 만들지 않도록).
+  const ESC = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ESC[c]);
 
   // style 속성에 넣기 전 색상값 검증 (hex 아니면 기본값)
   const safeColor = (c, fallback) => /^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : fallback;
@@ -131,20 +132,28 @@
       ${close}`;
   }
 
-  function render() {
-    const list = games.filter(g => {
-      const inTag = tagFilter === ALL || (g.tags || []).includes(tagFilter);
-      const hay = [g.title, g.desc, ...(g.tags || [])].join(' ').toLowerCase();
-      return inTag && hay.includes(keyword);
-    });
+  // 게임 목록은 로드 후 바뀌지 않으므로, 카드 HTML과 검색용 문자열을
+  // 최초 1회만 만들어 둔다. 기존에는 키 입력마다 전체 카드를 다시 조립하고
+  // 검색 문자열도 매번 join+toLowerCase 했다.
+  const entries = games.map(g => ({
+    tags: g.tags || [],
+    hay:  [g.title, g.desc, ...(g.tags || [])].join(' ').toLowerCase(),
+    html: cardHTML(g)
+  }));
 
-    grid.innerHTML = list.length
-      ? list.map(cardHTML).join('')
-      : `<div class="empty">
-           <div class="big" aria-hidden="true">🔍</div>
-           <p>조건에 맞는 게임이 없어요.</p>
-           <button class="reset" type="button" id="reset">검색·필터 초기화</button>
-         </div>`;
+  const EMPTY_HTML =
+    `<div class="empty">
+       <div class="big" aria-hidden="true">🔍</div>
+       <p>조건에 맞는 게임이 없어요.</p>
+       <button class="reset" type="button" id="reset">검색·필터 초기화</button>
+     </div>`;
+
+  function render() {
+    const all = tagFilter === ALL;
+    const list = entries.filter(e =>
+      (all || e.tags.includes(tagFilter)) && e.hay.includes(keyword));
+
+    grid.innerHTML = list.length ? list.map(e => e.html).join('') : EMPTY_HTML;
 
     srCount.textContent = list.length
       ? `게임 ${list.length}개가 표시되었습니다.`
