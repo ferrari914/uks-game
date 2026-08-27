@@ -500,9 +500,11 @@ function bounds(m){
   }
   return {minx:minx,maxx:maxx,miny:miny,maxy:maxy};
 }
+var BOUNDS={};
+function shapeBounds(type){ return BOUNDS[type]||(BOUNDS[type]=bounds(SHAPES[type])); }
 function drawMini(g,type,ox,oy,bw,bh){
   if(!type) return;
-  var m=SHAPES[type], b=bounds(m);
+  var m=SHAPES[type], b=shapeBounds(type);
   var w=(b.maxx-b.minx+1), h=(b.maxy-b.miny+1);
   var sx=ox+(bw-w*mc)/2, sy=oy+(bh-h*mc)/2, y, x;
   for(y=b.miny;y<=b.maxy;y++) for(x=b.minx;x<=b.maxx;x++) if(m[y][x])
@@ -536,6 +538,7 @@ function fit(){
   mc=Math.max(7,Math.min(16,Math.round(cell*0.44)));
   sizeMini(holdCv,hctx,4*mc,2*mc);
   sizeMini(nextCv,nctx,3*(4*mc)+2*mc,2*mc);
+  invalidate();   /* 캔버스 리사이즈로 내용이 지워졌다 */
   drawTrays();
 }
 var fitting=false;
@@ -576,11 +579,13 @@ function draw(){
 }
 
 /* ---------- UI ---------- */
+/* 매 프레임 호출되므로 바뀐 값만 쓴다. toLocaleString()과 DOM 쓰기를 아낀다 */
+var uiPrev={s:-1,l:-1,n:-1,b:-1};
 function updateUI(){
-  uiScore.textContent=score.toLocaleString();
-  uiLevel.textContent=level;
-  uiLines.textContent=lines;
-  uiBest.textContent=best.toLocaleString();
+  if(score!==uiPrev.s){ uiPrev.s=score; uiScore.textContent=score.toLocaleString(); }
+  if(level!==uiPrev.l){ uiPrev.l=level; uiLevel.textContent=level; }
+  if(lines!==uiPrev.n){ uiPrev.n=lines; uiLines.textContent=lines; }
+  if(best!==uiPrev.b){ uiPrev.b=best; uiBest.textContent=best.toLocaleString(); }
 }
 var msgTimer=null;
 function showMsg(t){
@@ -591,8 +596,7 @@ function showMsg(t){
 function showOverlay(title,text,btn,withSubmit){
   ovTitle.textContent=title; ovText.innerHTML=text; ovBtn.textContent=btn;
   ovSubmit.style.display = withSubmit ? '' : 'none';
-  if(typeof ovRevive!=='undefined' && ovRevive) ovRevive.style.display='none';
-  if(typeof ovVer!=='undefined' && ovVer) ovVer.style.display='none';
+  ovRevive.style.display='none'; ovVer.style.display='none';
   ovDecline.style.display='none'; ovQuit.style.display='none';
   ovHome.style.display='';
   overlay.classList.add('show');
@@ -1012,8 +1016,9 @@ quizClose.addEventListener('click',function(){ if(quizAnswered) finishQuiz(); el
 quizSheet.addEventListener('click',function(e){ if(e.target!==quizSheet) return; if(quizAnswered) finishQuiz(); else closeQuiz(); });
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.5.0';
+var VERSION='1.5.1';
 var CHANGELOG=[
+ {v:'1.5.1',t:['코드 최적화 — 화면이 바뀔 때만 다시 그리도록 개선(정지 화면에서 CPU·배터리 절약), 리사이즈 처리 통합']},
  {v:'1.5.0',t:['시작 화면과 결과 화면에 “홈으로” 버튼 추가 (일시정지 중에는 실수 방지를 위해 숨김)']},
  {v:'1.4.0',t:['일시정지 화면에 “게임 종료” 버튼 추가 (실수 방지를 위해 두 번 눌러야 종료)','게임오버 시 부활 여부를 먼저 묻고, 부활을 포기하거나 실패한 뒤에 랭킹 등록이 열리도록 변경','한 판에 랭킹이 두 번 등록되던 문제 수정']},
  {v:'1.3.0',t:['영어 문제에서 빈칸에 해당하는 한글 단어를 흰색으로 강조','시작 화면·일시정지 화면에 버전 정보 버튼 추가']},
@@ -1079,13 +1084,22 @@ function update(dt){
 
   updateUI();
 }
+/* 렌더 갱신 판정.
+   이전에는 시작 화면·일시정지·게임오버처럼 아무것도 변하지 않는 상태에서도
+   보드 전체와 트레이를 60fps로 다시 그렸다. 실제로 바뀔 때만 그리도록 한다. */
+var dirty=true, drawnState='', traySig='';
+function invalidate(){ dirty=true; traySig=''; }
+function trayState(){ return holdType+'|'+(canHold?1:0)+'|'+queue[0]+queue[1]+queue[2]; }
 var last=0;
 function frame(t){
   if(!last) last=t;
   var dt=Math.min(120,t-last); last=t;
   update(dt);
-  draw();
-  drawTrays();
+  if(state!==drawnState){ drawnState=state; dirty=true; }
+  /* 진행 중에는 조각이 움직이므로 항상, 그 외에는 무효화됐을 때만 */
+  if(state==='playing'||state==='clearing'||dirty){ draw(); dirty=false; }
+  var ts=trayState();
+  if(ts!==traySig){ traySig=ts; drawTrays(); }
   requestAnimationFrame(frame);
 }
 
@@ -1093,9 +1107,15 @@ function frame(t){
 if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
 document.addEventListener('gesturestart',function(e){ e.preventDefault(); });
 document.addEventListener('visibilitychange',function(){ if(document.hidden && state==='playing') togglePause(); });
-window.addEventListener('resize',fitAll);
-window.addEventListener('orientationchange',function(){ setTimeout(fitAll,250); });
-if(window.ResizeObserver){ new ResizeObserver(function(){ fitAll(); }).observe(wrap); }
+var fitQueued=false;
+function scheduleFit(){
+  if(fitQueued) return;
+  fitQueued=true;
+  requestAnimationFrame(function(){ fitQueued=false; fitAll(); });
+}
+window.addEventListener('resize',scheduleFit);
+window.addEventListener('orientationchange',function(){ setTimeout(scheduleFit,250); });
+if(window.ResizeObserver){ new ResizeObserver(scheduleFit).observe(wrap); }
 
 reset();
 fitAll();
