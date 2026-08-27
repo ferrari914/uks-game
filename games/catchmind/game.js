@@ -6,7 +6,8 @@
        전부 방장 기기에서 하고, 결과만 상태 메시지로 뿌린다.
      · 참가자는 상태를 받아 화면만 그린다.
      · 제시어는 전원 토픽에 절대 싣지 않는다. 출제자 개인 토픽으로만 보낸다.
-     · 페이로드 암복호화(방 키 AES-GCM)는 net.js가 전담한다. 여기서는 모른다.
+     · 토픽 ID·암호화 키를 방 코드에서 유도하고 페이로드를 AES-GCM으로 암복호화하는 일은
+       net.js가 전담한다. 여기서는 S.tid(토픽 ID)만 들고 쓴다.
 
    토픽
      ekcm/<코드>/s        방장 → 전원 (상태 retain / 채팅·시스템 메시지 non-retain)
@@ -79,9 +80,9 @@ var LS_CFG='cm_cfg', LS_ME='cm_me';
 
 var CHANGELOG=[
  {v:'1.0.0',t:['캐치마인드 첫 공개',
-               '초대 링크로 접속하는 실시간 그림 퀴즈 (공용 MQTT 브로커)',
+               '방 코드 5자로 들어가는 실시간 그림 퀴즈 (공용 MQTT 브로커)',
                '개인전 2~8명 / 팀전 2:2~4:4, 라운드 3·5·7·10 선택',
-               '초대 링크에만 실리는 방 키로 모든 페이로드를 AES-GCM 암호화']}
+               '방 코드로 토픽 ID와 암호화 키를 따로 유도해 다른 방에서 엿보지 못하게 처리']}
 ];
 
 /* ===================== 유틸 ===================== */
@@ -90,7 +91,6 @@ function rid(n,pool){
   for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];
   return s;
 }
-function roomKey(){ return rid(16,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789') }
 function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(m){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
@@ -156,7 +156,7 @@ var ovl=document.getElementById('ovl');
 var S={
   screen:'home', name:'', emIdx:Math.floor(Math.random()*EMOJIS.length),
   pid:rid(12,'abcdefghijklmnopqrstuvwxyz0123456789'),
-  code:'', key:'', isHost:false,
+  code:'', tid:'', isHost:false,
   net:'idle', err:'', offset:0, lastState:0, lastPub:0, hop:0, hopAt:0,
   chat:[], chatSeen:{}, lastSent:0,
   myWord:null, myCands:null,            // 출제자 본인만 아는 정보
@@ -176,11 +176,21 @@ var DRAW={
 };
 
 /* ===================== 토픽 ===================== */
-function tS(){ return 'ekcm/'+S.code+'/s' }
-function tC(){ return 'ekcm/'+S.code+'/c' }
-function tD(){ return 'ekcm/'+S.code+'/d' }
-function tP(pid){ return 'ekcm/'+S.code+'/p/'+pid }
-function inviteLink(){ return location.origin+location.pathname+'#'+S.code+'-'+S.key }
+/* 토픽에는 방 코드가 아니라 토픽 ID(코드의 해시)를 쓴다.
+   방 코드를 토픽에 그대로 실으면 ekcm/# 로 엿보는 제3자가 코드를 읽어
+   그대로 키를 만들 수 있다 — 암호화가 통째로 무의미해진다.
+   S.tid는 방 생성·입장 시점에 한 번만 계산해 둔다(해시가 async라 여기선 동기로 쓴다). */
+function tS(){ return 'ekcm/'+S.tid+'/s' }
+function tC(){ return 'ekcm/'+S.tid+'/c' }
+function tD(){ return 'ekcm/'+S.tid+'/d' }
+function tP(pid){ return 'ekcm/'+S.tid+'/p/'+pid }
+function inviteLink(){ return location.origin+location.pathname+'#'+S.code }
+/* 방 코드로 토픽 ID·암호화 키를 준비한다. 연결·구독보다 먼저 끝나야 한다. */
+function prepareRoom(code){
+  S.code=code;
+  NET.setKey(code);
+  return window.CM_NET.topicId(code).then(function(tid){ S.tid=tid; return tid });
+}
 
 /* ===================== 설정 저장 ===================== */
 function loadCfg(){
@@ -237,15 +247,14 @@ function canMulti(){ return !!(window.CM_NET&&window.CM_NET.cryptoOk()) }
 var HTTPS_MSG='멀티플레이는 https 주소에서만 됩니다. 파일을 직접 열거나 http로 열면 연결이 막힙니다.';
 
 /* ===================== 홈 화면 ===================== */
+/* 받아들이는 형태: 초대 링크 전체 / '#ABC12' / 'ABC12' / 소문자 / 옛 형식 'ABC12-<키>'.
+   옛 링크를 붙여넣는 사람이 있으므로 뒤에 -무언가가 붙어도 앞 5자만 떼어 쓴다. */
 function parseInvite(str){
   var t=String(str||'').trim();
   var h=t.indexOf('#'); if(h>=0)t=t.slice(h+1);
   t=t.replace(/\s+/g,'');
-  var m=/^([A-Za-z0-9]{5})-([A-Za-z0-9]{16})$/.exec(t);
-  if(m)return {code:m[1].toUpperCase(),key:m[2]};
-  m=/^([A-Za-z0-9]{5})$/.exec(t);
-  if(m)return {code:m[1].toUpperCase(),key:''};
-  return null;
+  var m=/^([A-Za-z0-9]{5})(?:-[A-Za-z0-9]*)?$/.exec(t);
+  return m?{code:m[1].toUpperCase()}:null;
 }
 function renderHome(){
   var inv=parseInvite(location.hash);
@@ -263,7 +272,7 @@ function renderHome(){
   ((httpsWarn()||!canMulti())?'<div class="warnbox">멀티플레이는 <b>https 주소</b>에서만 됩니다. '+
     '지금은 <code>'+esc(location.protocol)+'</code>로 열려 있습니다'+
     (canMulti()?' (localhost는 예외적으로 동작할 수 있습니다).'
-              :' — 브로커 연결과 방 키 암호화가 막혀 방을 만들거나 들어갈 수 없습니다.')+
+              :' — 브로커 연결과 암호화가 막혀 방을 만들거나 들어갈 수 없습니다.')+
     ' 화면과 그리기 도구는 그대로 확인할 수 있습니다.</div>':'')+
 
   '<div class="card"><label class="lbl" for="nm">이름</label>'+
@@ -273,18 +282,19 @@ function renderHome(){
   EMOJIS.map(function(e,i){return '<button type="button" data-i="'+i+'" aria-pressed="'+(i===S.emIdx)+'">'+e+'</button>'}).join('')+
   '</div></div>'+
 
-  (inv&&inv.key?'<div class="card"><h3>초대받은 방 '+esc(inv.code)+'</h3>'+
+  (inv?'<div class="card"><h3>초대받은 방 '+esc(inv.code)+'</h3>'+
    '<button class="btn btn-main" id="jn2" style="width:100%">바로 입장</button></div>':'')+
 
   '<div class="card"><h3>방 만들기</h3>'+
-  '<button class="btn btn-main" id="mk" style="width:100%"'+(noWords?' disabled':'')+'>새 방 열고 초대 링크 받기</button>'+
+  '<button class="btn btn-main" id="mk" style="width:100%"'+(noWords?' disabled':'')+'>새 방 열고 방 코드 받기</button>'+
   '<h3 style="margin-top:24px">친구 방에 들어가기</h3>'+
-  '<label class="lbl" for="cd">초대 링크나 초대 코드를 붙여넣으세요</label>'+
-  '<div class="row"><input type="text" id="cd" placeholder="ABC12-xxxxxxxxxxxxxxxx" style="flex:2" '+
-  'value="'+esc(inv?(inv.code+(inv.key?'-'+inv.key:'')):'')+'" autocomplete="off">'+
+  '<label class="lbl" for="cd">방 코드 5자 (초대 링크를 붙여넣어도 됩니다)</label>'+
+  '<div class="row"><input type="text" id="cd" maxlength="40" placeholder="ABC12" '+
+  'style="flex:2;text-transform:uppercase" '+
+  'value="'+esc(inv?inv.code:'')+'" autocomplete="off">'+
   '<button class="btn btn-ghost" id="jn" style="flex:1">입장</button></div>'+
   '<div class="err" id="er">'+esc(S.err)+'</div>'+
-  '<p class="note">방 코드만으로는 입장할 수 없습니다. 방마다 열쇠가 따로 있고, 그 열쇠는 초대 링크 안에 들어 있습니다. '+
+  '<p class="note">초대 링크를 받았거나, <b>방 코드 5자</b>만 알면 들어올 수 있습니다. 대소문자는 가리지 않습니다. '+
   '이름·그림·채팅은 같은 방 사람들에게 보이니 민감한 내용은 넣지 마세요.</p></div>'+
   '</div>';
 
@@ -312,9 +322,8 @@ function createRoom(){
   if(!canMulti()){ fail(HTTPS_MSG); return }
   S.name=cleanName(document.getElementById('nm').value); saveMe();
   fail('연결 중…');
-  ensureNet().then(function(){
-    S.code=rid(5); S.key=roomKey(); S.isHost=true;
-    NET.setKey(S.key);
+  prepareRoom(rid(5)).then(ensureNet).then(function(){
+    S.isHost=true;
     G={ gno:0, phase:'lobby', players:{}, cfg:loadCfg(),
         order:[], rd:0, ti:0, tk:'', drawer:null,
         cands:null, wordIdx:-1, word:null, used:{},
@@ -334,14 +343,12 @@ function createRoom(){
 }
 function joinRoom(raw){
   var inv=parseInvite(raw);
-  if(!inv){ fail('초대 링크나 코드를 다시 확인해 주세요.'); return }
-  if(!inv.key){ fail('초대 링크가 필요합니다. 방 코드만으로는 입장할 수 없어요 — 친구가 보낸 링크 전체를 붙여넣으세요.'); return }
+  if(!inv){ fail('방 코드 5자를 입력하거나 초대 링크를 붙여넣어 주세요.'); return }
   if(!canMulti()){ fail(HTTPS_MSG); return }
   S.name=cleanName(document.getElementById('nm').value); saveMe();
   fail('연결 중…');
-  ensureNet().then(function(){
-    S.code=inv.code; S.key=inv.key; S.isHost=false; S.lastState=0;
-    NET.setKey(S.key);
+  prepareRoom(inv.code).then(ensureNet).then(function(){
+    S.isHost=false; S.lastState=0;
     NET.sub(tS(),onHostMsg);
     NET.sub(tP(S.pid),onPrivate);
     NET.sub(tD(),onDraw);
@@ -353,8 +360,8 @@ function joinRoom(raw){
       if(S.lastState||!S.code){clearInterval(iv);return}
       if(waited>6000){
         clearInterval(iv); NET.unsub(tS()); NET.unsub(tP(S.pid)); NET.unsub(tD());
-        S.code=''; S.key='';
-        fail('그 방을 찾지 못했어요. 링크가 맞는지, 방장이 아직 창을 열어두었는지 확인해 주세요.');
+        S.code=''; S.tid='';
+        fail('그 방을 찾지 못했어요. 방 코드가 맞는지, 방장이 아직 창을 열어두었는지 확인해 주세요.');
       }
     },250);
     startPing();
@@ -374,7 +381,7 @@ function leaveRoom(silent){
   clearInterval(DRAW.timer);
   hostTimer=uiTimer=pingTimer=DRAW.timer=null;
   G=null; V=null;
-  S.code=''; S.key=''; S.isHost=false; S.myWord=null; S.myCands=null;
+  S.code=''; S.tid=''; S.isHost=false; S.myWord=null; S.myCands=null;
   S.chat=[]; S.chatSeen={}; S.ovlKey=''; S.seenTurn=''; S.syncedTurn=''; S.hop=0; S.hopAt=0; S.lastState=0; S.lastPub=0;
   DRAW.strokes=[]; DRAW.cur=null; DRAW.out=[]; DRAW.ctx=null; DRAW.cv=null;
   hideOvl();
@@ -420,7 +427,7 @@ function startPing(){
 function hostGone(){
   leaveRoom(true);
   showNotice('방장과 연결이 끊겼습니다',
-    '방장 쪽에서 소식이 끊겨 방에서 나왔습니다. 초대 링크로 다시 들어가 보세요.','홈으로');
+    '방장 쪽에서 소식이 끊겨 방에서 나왔습니다. 방 코드로 다시 들어가 보세요.','홈으로');
 }
 
 /* ===================== 방장 로직 ===================== */
@@ -894,8 +901,8 @@ function renderLobby(){
   app.innerHTML=
   '<div class="narrow">'+
   '<div class="codebox"><div class="lbl2">방 코드</div><div class="code">'+esc(S.code)+'</div>'+
-  '<div style="font-size:12.5px;color:var(--muted);line-height:1.6">초대 <b>링크</b>를 보내야 친구가 들어올 수 있습니다<br>'+
-  '(코드만으로는 입장 불가)</div>'+
+  '<div style="font-size:12.5px;color:var(--muted);line-height:1.6">친구에게 <b>이 코드</b>만 알려주면 됩니다<br>'+
+  '(링크를 보내도 되고, 코드 5자만 불러줘도 됩니다)</div>'+
   '<div class="row" style="margin-top:12px">'+
   '<button class="btn btn-ghost" id="cp" style="font-size:13px">초대 링크 복사</button>'+
   '<button class="btn btn-ghost" id="cp2" style="font-size:13px">초대 코드 복사</button></div></div>'+
@@ -915,7 +922,7 @@ function renderLobby(){
 
   document.getElementById('lv').onclick=function(){ askLeave() };
   document.getElementById('cp').onclick=function(e){ copy(inviteLink(),e.target,'초대 링크 복사') };
-  document.getElementById('cp2').onclick=function(e){ copy(S.code+'-'+S.key,e.target,'초대 코드 복사') };
+  document.getElementById('cp2').onclick=function(e){ copy(S.code,e.target,'초대 코드 복사') };
   bindChat();
   paintLobby(); paintChat();
 }
@@ -1178,7 +1185,7 @@ function showNotice(title,body,btn){
 }
 function roomClosed(){
   leaveRoom(true);
-  showNotice('방이 닫혔습니다','방장이 나가서 방이 닫혔습니다. 새 방을 만들거나 다른 초대 링크로 들어가 주세요.','홈으로');
+  showNotice('방이 닫혔습니다','방장이 나가서 방이 닫혔습니다. 새 방을 만들거나 다른 방 코드로 들어가 주세요.','홈으로');
 }
 function paintOvl(){
   /* 사용자가 직접 연 시트(버전 정보·안내)는 상태 갱신이 덮어쓰지 않는다 */

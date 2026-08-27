@@ -9,7 +9,10 @@
        현재 클라이언트를 버리고 **다음 브로커로 승격**한다(subs 전부 재구독).
        목록은 순환하고, MAX_ROUNDS 바퀴를 돌고도 실패하면 포기하고 알린다.
    · mqtt.js CDN 2중 폴백 (unpkg → jsdelivr)
-   · 모든 페이로드를 방 키로 AES-GCM 암복호화한다 (SPEC 9항)
+   · 방 코드 하나로 토픽 ID와 암호화 키를 각각 유도한다 (솔트가 다르다).
+     토픽에는 방 코드가 나타나지 않으므로, ekcm/# 와일드카드로 엿보는 제3자는
+     의미 없는 hex 토픽과 암호문만 본다. 방 코드를 아는 친구는 그냥 들어온다.
+   · 모든 페이로드를 그 키로 AES-GCM 암복호화한다 (SPEC 9항)
        - 암복호화는 이 파일 안에서만 일어난다. game.js는 평범한 객체만 주고받는다.
        - 반복키 XOR은 쓰지 않는다. JSON 앞머리가 사실상 고정이라 알려진 평문 공격에
          바로 뚫려서 난독화 효과가 없다.
@@ -19,8 +22,9 @@
        - 복호화 실패는 throw하지 않고 조용히 버린다 → 남의 방 메시지가 자동으로 걸러진다.
    · ⚠ crypto.subtle은 전부 async라, 그냥 호출하면 스트로크 순서가 뒤집힌다.
      발행(pubQ)·수신(recvQ) 각각에 프라미스 체인 큐를 둬서 직렬화한다.
-   · 한계: 링크를 받은 사람은 개발자도구로 방 키를 볼 수 있다. 이 암호화가 막는 것은
-     링크를 받지 않은 제3자의 브로커 도청뿐이다. (README 참고)
+   · 한계: 방 코드를 아는 사람은 당연히 다 읽는다. 이 암호화가 막는 것은
+     방 코드를 모르는 제3자의 브로커 도청뿐이다. 코드가 5자라 오프라인
+     무차별 대입은 이론상 가능하다(PBKDF2 반복이 비용을 올린다). (README 12-b 참고)
    ========================================================================= */
 (function(){
 "use strict";
@@ -41,11 +45,28 @@ var MAX_ROUNDS=3;       // 브로커 목록을 이만큼 돌고도 실패하면 
 
 /* ===== Web Crypto ===== */
 var SUB=(window.crypto&&window.crypto.subtle)?window.crypto.subtle:null;
-var SALT='ekcm-v1-room-salt';
-var ITER=100000;
+/* 방 코드 하나에서 서로 다른 두 값을 뽑는다. 솔트를 달리해 서로를 역산할 수 없게 한다.
+   - 토픽 ID: 브로커에 그대로 노출되는 값. 방 코드가 토픽에 나타나면 안 된다.
+   - 암호화 키: 페이로드를 여는 값.
+   토픽 ID만 보고 방 코드를 되돌릴 수 없고, 따라서 키도 만들 수 없다. */
+var SALT_TOPIC='ekcm-v2-topic-salt';
+var SALT_KEY='ekcm-v2-key-salt';
+/* 방 코드는 5자(약 3,300만 조합)라 오프라인 무차별 대입이 이론상 가능하다.
+   반복 횟수가 그 비용을 그대로 곱해 준다. 방 입장 때 한 번만 계산한다. */
+var ITER=250000;
 var IV_LEN=12;
 
 function cryptoOk(){ return !!SUB }
+
+/* 방 코드 → 토픽 ID (SHA-256 앞 16 hex자). 토픽에는 이 값만 쓴다. */
+function topicId(code){
+  if(!SUB)return Promise.reject(new Error('no-subtle'));
+  return SUB.digest('SHA-256',u8(String(code||'').toUpperCase()+SALT_TOPIC)).then(function(buf){
+    var a=new Uint8Array(buf),h='',i;
+    for(i=0;i<8;i++)h+=('0'+a[i].toString(16)).slice(-2);
+    return h;                                  // 8바이트 = 16 hex자
+  });
+}
 
 function u8(s){
   if(window.TextEncoder)return new TextEncoder().encode(s);
@@ -69,13 +90,13 @@ function unb64(s){
   for(i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);
   return a;
 }
-/* 방 키(16자) → AES-GCM 256비트 키 */
-function deriveKey(roomKey){
+/* 방 코드 → AES-GCM 256비트 키 (토픽 ID와는 다른 솔트를 쓴다) */
+function deriveKey(code){
   if(!SUB)return Promise.reject(new Error('no-subtle'));
-  return SUB.importKey('raw',u8(roomKey),{name:'PBKDF2'},false,['deriveKey'])
+  return SUB.importKey('raw',u8(String(code||'').toUpperCase()),{name:'PBKDF2'},false,['deriveKey'])
     .then(function(base){
       return SUB.deriveKey(
-        {name:'PBKDF2',salt:u8(SALT),iterations:ITER,hash:'SHA-256'},
+        {name:'PBKDF2',salt:u8(SALT_KEY),iterations:ITER,hash:'SHA-256'},
         base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
     });
 }
@@ -214,7 +235,7 @@ function makeMqttNet(){
       return {on:online(), url:curUrl, connected:!!(cl&&cl.connected),
               hasClient:!!cl, bi:bi, rounds:rounds, dead:dead, subs:Object.keys(subs)};
     },
-    /* 방 키 설정. 방을 만들거나 초대 링크로 들어올 때 한 번 넣는다. */
+    /* 방 코드 설정. 방을 만들거나 입장할 때 한 번 넣는다. */
     setKey:function(k){
       keyP=deriveKey(String(k||''));
       keyP.catch(noop);                // 미처리 거부 경고 방지
@@ -286,7 +307,7 @@ function loadMqtt(){
   });
 }
 
-window.CM_NET={ make:makeMqttNet, brokers:BROKERS, cryptoOk:cryptoOk };
+window.CM_NET={ make:makeMqttNet, brokers:BROKERS, cryptoOk:cryptoOk, topicId:topicId };
 /* game.js가 만든 인스턴스의 진단 함수만 노출한다 (콘솔에서 window.__CMNET.info()).
    인스턴스를 통째로 내보내면 pub()까지 열려서, 같은 방 참가자가 방장 상태 메시지를
    한 줄로 위조할 수 있다. 키는 이미 링크에 있으니 원리상 막을 수는 없지만
