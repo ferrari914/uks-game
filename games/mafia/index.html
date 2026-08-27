@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0a0d16">
+<meta name="description" content="밤·토론·투표·최후의 반론까지 그대로인 클래식 마피아. 혼자서도, 친구들과 4~8인 멀티로도.">
+<meta property="og:title" content="마피아">
+<meta property="og:description" content="클래식 마피아 — 싱글플레이와 4~8인 멀티플레이">
+<meta property="og:type" content="website">
+<title>마피아</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d16;--panel:#141a2b;--panel2:#1b2338;--line:#28324f;
+  --text:#e8ecf7;--muted:#8b95b3;--accent:#ff4d6d;--cy:#37e0f0;--gold:#ffd166;
+}
+html,body{height:100%;overscroll-behavior:none}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR",system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  transition:background-image .8s ease;
+  background-image:radial-gradient(900px 620px at 50% -12%,#1a2143 0%,rgba(10,13,22,0) 66%);
+}
+body.day{background-image:radial-gradient(900px 620px at 50% -12%,#3a2436 0%,rgba(10,13,22,0) 66%)}
+body.over{background-image:radial-gradient(900px 620px at 50% -12%,#2b1626 0%,rgba(10,13,22,0) 66%)}
+#stage{
+  height:100vh;height:100dvh;width:100%;max-width:460px;
+  display:flex;flex-direction:column;gap:7px;
+  padding:calc(7px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+}
+/* ---- 헤더 ---- */
+#top{display:flex;align-items:center;gap:6px;flex:none}
+.back{position:relative;width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;color:var(--muted);
+  text-decoration:none;font-size:15px;font-weight:700}
+/* 겉모습은 32px 그대로 두고 터치 히트 영역만 44px로 넓힌다 (모바일 최소 터치 타깃) */
+.back::after{content:'';position:absolute;top:-6px;right:-6px;bottom:-6px;left:-6px}
+.back:hover{color:var(--text);border-color:var(--accent)}
+#phaseBox{flex:1;min-width:0;display:flex;align-items:baseline;gap:6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:5px 10px;height:32px}
+#phaseName{font-size:13.5px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+#dayNum{font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#timer{flex:none;min-width:44px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--cy)}
+#timer.low{color:var(--accent);border-color:#59243a}
+.ic{width:32px;height:32px;flex:none;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;color:var(--muted);font-size:13px;font-family:inherit;font-weight:700;cursor:pointer}
+.ic:hover{color:var(--text);border-color:var(--accent)}
+.ic:active{transform:translateY(1px)}
+/* ---- 명단 ---- */
+#roster{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.pc{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:5px 3px 4px;text-align:center;cursor:default;min-width:0;overflow:hidden}
+.pc .av{font-size:19px;line-height:1.15;display:block}
+.pc .nm{display:block;font-size:10.5px;font-weight:700;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.pc .rl{display:block;font-size:8.5px;color:var(--muted);font-weight:700;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc.me{border-color:var(--cy);background:rgba(55,224,240,.08)}
+.pc.dead{opacity:.35}
+.pc.dead .av{filter:grayscale(1)}
+.pc.mate{border-color:var(--accent);background:rgba(255,77,109,.09)}
+.pc.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.28)}
+.pc.pick{cursor:pointer}
+.pc.pick:active{transform:translateY(1px)}
+.badge{position:absolute;top:2px;right:3px;min-width:16px;height:16px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;border-radius:8px;
+  font-size:9.5px;font-weight:800;font-variant-numeric:tabular-nums;
+  background:var(--accent);color:#1a0209}
+.badge.poll{background:var(--cy);color:#04121a}
+.badge.x{background:#3a4258;color:#c6cee1}
+/* ---- 로그 ---- */
+#log{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:rgba(11,15,26,.55);border:1px solid var(--line);border-radius:12px;
+  padding:9px;display:flex;flex-direction:column;gap:6px}
+.msg{display:flex;gap:6px;align-items:flex-start}
+.msg .mav{flex:none;width:23px;height:23px;border-radius:7px;background:var(--panel2);
+  display:flex;align-items:center;justify-content:center;font-size:13px}
+.msg .bd{min-width:0;flex:1}
+.msg .who{font-size:9.5px;color:var(--muted);font-weight:700;margin-bottom:1px}
+.msg .tx{font-size:12.5px;line-height:1.55;word-break:break-word;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:5px 8px;display:inline-block;max-width:100%}
+.msg.me .tx{background:#1d2a44;border-color:#2f4166}
+.msg.mafiaCh .tx{background:rgba(255,77,109,.11);border-color:#5a2436}
+.msg.mafiaCh .who{color:var(--accent)}
+.msg.deadCh .tx{background:#171b27;border-color:#242c40;color:#a8b1c7}
+.msg.deadCh .who{color:#7b849c}
+.sys{font-size:11px;line-height:1.6;color:var(--muted);text-align:center;padding:1px 4px;word-break:keep-all}
+.sys.big{color:var(--gold);font-weight:800;font-size:12.5px}
+.sys.bad{color:var(--accent);font-weight:800;font-size:12.5px}
+.sys.priv{color:var(--cy);font-weight:700;background:rgba(55,224,240,.08);
+  border:1px solid #1d4a55;border-radius:9px;padding:5px 8px}
+.sys.hr{border-top:1px solid var(--line);margin-top:3px;padding-top:6px;letter-spacing:.06em;font-weight:800;color:#6f7a97}
+/* ---- 하단 ---- */
+#foot{flex:none;display:flex;flex-direction:column;gap:6px}
+#hintBar{font-size:11px;line-height:1.5;color:var(--muted);text-align:center;min-height:16px;word-break:keep-all}
+#hintBar b{color:var(--gold)}
+#actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:center}
+.ab{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:9px 4px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ab:active{transform:translateY(1px)}
+.ab:disabled{opacity:.35;cursor:default}
+.ab.on{border-color:var(--gold);color:var(--gold)}
+.ab.yes{background:linear-gradient(180deg,#ff5d7a,#d92b4d);border:0;color:#fff}
+.ab.no{background:var(--panel2);border-color:#3a4763}
+#inputRow{display:flex;gap:5px}
+#chatIn{flex:1;min-width:0;background:#0d1220;border:1px solid var(--line);border-radius:10px;
+  padding:10px 11px;color:var(--text);font-family:inherit;font-size:14px;outline:none}
+#chatIn:focus{border-color:var(--accent)}
+#chatIn:disabled{opacity:.45}
+#chatIn.mafia{border-color:#5a2436;background:#170d14}
+#chatIn.dead{border-color:#333c52;background:#12141c}
+#sendBtn{flex:none;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:0 14px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer}
+#sendBtn:active{transform:translateY(1px)}
+/* ---- 시트 ---- */
+.sheet{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+  padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(4,7,13,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.sheet.show{display:flex}
+.card{width:100%;max-width:420px;max-height:100%;display:flex;flex-direction:column;gap:12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
+  box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.cardHead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
+.cardHead h2{font-size:17px;font-weight:800}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:58vh;
+  display:flex;flex-direction:column;gap:9px}
+.btn{background:linear-gradient(180deg,#ff5d7a,#d92b4d);color:#fff;border:0;border-radius:11px;
+  padding:12px 22px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;width:100%;
+  display:block;text-align:center}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line);font-weight:700;font-size:13.5px;padding:10px 18px}
+.btn.ghost:hover{border-color:var(--accent)}
+.lead{font-size:12.5px;line-height:1.8;color:var(--muted);word-break:keep-all}
+.lead b{color:var(--text)}
+#nick,.tin{width:100%;background:#0d1220;border:1px solid var(--line);border-radius:10px;
+  padding:12px;color:var(--text);font-family:inherit;font-size:15px;outline:none}
+#nick:focus,.tin:focus{border-color:var(--accent)}
+/* ---- 모드 선택 / 멀티 ---- */
+.mcard{display:block;width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);
+  border-radius:12px;padding:12px 13px;color:var(--text);font-family:inherit;cursor:pointer}
+.mcard:hover{border-color:var(--accent)}
+.mcard:active{transform:translateY(1px)}
+.mcard h4{font-size:14.5px;font-weight:800;margin-bottom:3px}
+.mcard p{font-size:11.5px;line-height:1.6;color:var(--muted);word-break:keep-all}
+.mcard:disabled{opacity:.4;cursor:default}
+.mcard:disabled:hover{border-color:var(--line)}
+.orLine{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--muted);font-weight:700}
+.orLine:before,.orLine:after{content:'';flex:1;height:1px;background:var(--line)}
+.codeBox{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:10px;padding:9px 11px}
+.codeBox b{flex:1;font-size:21px;font-weight:800;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--gold)}
+.codeBox .ic{width:auto;padding:0 10px;font-size:11px}
+.warn{font-size:11.5px;line-height:1.6;color:var(--gold);background:rgba(255,209,102,.08);
+  border:1px solid #574a24;border-radius:9px;padding:8px 10px;word-break:keep-all}
+.err{color:var(--accent)}
+#netDot{flex:none;width:8px;height:8px;border-radius:50%;background:#3a4258}
+#netDot.on{background:#39d98a}
+#netDot.off{background:var(--accent)}
+.roleRow{display:grid;grid-template-columns:34px 1fr;gap:9px;align-items:start;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.roleRow .e{font-size:20px;text-align:center;line-height:1.2}
+.roleRow h4{font-size:13px;font-weight:800;margin-bottom:2px}
+.roleRow h4 small{font-size:9.5px;font-weight:700;color:var(--muted);margin-left:5px;letter-spacing:.04em}
+.roleRow p{font-size:11.5px;line-height:1.65;color:var(--muted);word-break:keep-all}
+.reveal{text-align:center;padding:6px 0 2px}
+.reveal .e{font-size:52px;line-height:1.1}
+.reveal h3{font-size:23px;font-weight:800;margin-top:4px}
+.reveal h3.mafia{color:var(--accent)}
+.reveal h3.citizen{color:var(--cy)}
+.reveal p{font-size:12.5px;line-height:1.75;color:var(--muted);margin-top:8px;word-break:keep-all}
+.reveal p b{color:var(--text)}
+.endList{list-style:none;display:flex;flex-direction:column;gap:5px}
+.endList li{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:8px;
+  background:var(--panel2);border:1px solid transparent;border-radius:9px;padding:7px 9px;font-size:12.5px}
+.endList li.mine{border-color:var(--cy)}
+.endList li.gone{opacity:.5}
+.endList .e{font-size:16px;text-align:center}
+.endList .n{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.endList .r{font-size:11.5px;font-weight:800}
+.endList .r.mafia{color:var(--accent)}
+.endList .r.citizen{color:var(--cy)}
+.big{font-size:26px;font-weight:800;text-align:center;letter-spacing:.02em}
+.big.win{color:var(--cy)}
+.big.lose{color:var(--accent)}
+.row2{display:flex;gap:8px}
+.row2>*{flex:1}
+@media (max-height:640px){
+  .pc:not(.me):not(.mate) .rl{display:none}
+  .msg .tx{font-size:12px}
+  #roster{gap:4px}
+  .pc{padding:4px 3px 3px}
+}
+</style>
+</head>
+<body class="night">
+
+<div id="stage">
+  <header id="top">
+    <a class="back" href="../../index.html" title="허브로 돌아가기" aria-label="허브로 돌아가기"><span aria-hidden="true">←</span></a>
+    <div id="phaseBox"><i id="netDot" hidden></i><b id="phaseName">준비</b><span id="dayNum"></span></div>
+    <div id="timer">--</div>
+    <button class="ic" id="skipBtn" title="건너뛰기">⏭</button>
+    <button class="ic" id="helpBtn" title="규칙">?</button>
+  </header>
+  <div id="roster"></div>
+  <div id="log"></div>
+  <div id="foot">
+    <div id="hintBar"></div>
+    <div id="actions"></div>
+    <div id="inputRow">
+      <input id="chatIn" type="text" maxlength="60" placeholder="메시지 입력" autocomplete="off" disabled>
+      <button id="sendBtn">전송</button>
+    </div>
+  </div>
+</div>
+
+<!-- 모드 선택 -->
+<div class="sheet show" id="modeSheet">
+  <div class="card">
+    <div class="cardHead"><h2>🔪 마피아</h2></div>
+    <p class="lead">밤에는 마피아가 움직이고, 낮에는 모두가 서로를 의심한다.<br>
+      토론 · 투표 · 최후의 반론까지 그대로.<br>
+      <b>직업은 매판 무작위입니다.</b></p>
+    <button class="mcard" id="modeSingle" aria-label="싱글플레이 — AI 7명과 겨루는 8인 클래식전">
+      <h4>🧍 싱글플레이</h4>
+      <p>AI 7명과 겨루는 8인 클래식전. 혼자서 바로 시작할 수 있습니다.</p>
+    </button>
+    <button class="mcard" id="modeMulti" aria-label="멀티플레이 — 친구들과 방을 만들어 함께 하는 마피아">
+      <h4>🌐 멀티플레이</h4>
+      <p id="modeMultiDesc">친구들과 방을 만들어 함께 하는 마피아. 4~8인.</p>
+    </button>
+    <button class="btn ghost" id="rulesBtn2">규칙 보기</button>
+  </div>
+</div>
+
+<!-- 시작 (싱글) -->
+<div class="sheet" id="startSheet">
+  <div class="card">
+    <div class="cardHead"><h2>🧍 싱글플레이</h2><button class="ic" id="startX">✕</button></div>
+    <p class="lead">AI 7명과 겨루는 <b>8인 클래식전</b>.<br>
+      마피아 2 · 경찰 1 · 의사 1 · 군인 1 · 정치인 1 · 영매 1 · 시민 1<br>
+      직업은 매판 무작위입니다. <b>당신이 마피아일 수도 있습니다.</b></p>
+    <input id="nick" type="text" maxlength="6" value="플레이어" placeholder="닉네임 (최대 6자)" autocomplete="off">
+    <button class="btn" id="startBtn">게임 시작</button>
+    <button class="btn ghost" id="rulesBtn">규칙 보기</button>
+  </div>
+</div>
+
+<!-- 멀티: 방 만들기 / 입장 -->
+<div class="sheet" id="mpSheet">
+  <div class="card">
+    <div class="cardHead"><h2>🌐 멀티플레이</h2><button class="ic" id="mpX">✕</button></div>
+    <p class="lead">친구들과 방을 만들어 함께 하는 마피아. <b>4~8인</b>.<br>
+      방을 만들고 초대 링크를 보내면 됩니다.</p>
+    <input class="tin" id="mpNick" type="text" maxlength="6" placeholder="닉네임 (최대 6자)" autocomplete="off">
+    <button class="btn" id="mpCreate">방 만들기</button>
+    <div class="orLine">또는</div>
+    <div class="row2">
+      <input class="tin" id="mpCode" type="text" maxlength="5" placeholder="방 코드 5자리" autocomplete="off" style="text-transform:uppercase">
+      <button class="btn ghost" id="mpJoin" style="flex:none;width:88px">입장</button>
+    </div>
+    <p class="lead" id="mpMsg"></p>
+  </div>
+</div>
+
+<!-- 멀티: 대기실 -->
+<div class="sheet" id="lobbySheet">
+  <div class="card">
+    <div class="cardHead"><h2>대기실</h2><button class="ic" id="lobbyX" title="나가기">✕</button></div>
+    <div class="codeBox"><b id="lobbyCode">-----</b><button class="ic" id="copyBtn">링크 복사</button></div>
+    <ul class="endList scroll" id="lobbyList"></ul>
+    <p class="warn" id="lobbyWarn"></p>
+    <p class="lead" id="lobbyNote"></p>
+    <button class="btn" id="lobbyStart">게임 시작</button>
+  </div>
+</div>
+
+<!-- 직업 공개 -->
+<div class="sheet" id="roleSheet">
+  <div class="card">
+    <div class="reveal">
+      <div class="e" id="rvE">🧑</div>
+      <h3 id="rvN">시민</h3>
+      <p id="rvD"></p>
+    </div>
+    <button class="btn" id="roleOk">첫 번째 밤 시작</button>
+  </div>
+</div>
+
+<!-- 규칙 -->
+<div class="sheet" id="helpSheet">
+  <div class="card">
+    <div class="cardHead"><h2>규칙</h2><button class="ic" id="helpX">✕</button></div>
+    <div class="scroll" id="helpBody"></div>
+    <button class="btn ghost" id="helpX2">닫기</button>
+  </div>
+</div>
+
+<!-- 종료 -->
+<div class="sheet" id="endSheet">
+  <div class="card">
+    <div class="big" id="endTitle">게임 종료</div>
+    <p class="lead" id="endDesc"></p>
+    <ul class="endList scroll" id="endList"></ul>
+    <div class="row2">
+      <button class="btn" id="againBtn">다시하기</button>
+      <a class="btn ghost" href="../../index.html" style="text-align:center;text-decoration:none;line-height:1.6">허브로</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= 유틸 ================= */
+var $=function(s){return document.querySelector(s);};
+var rnd=function(n){return Math.floor(Math.random()*n);};
+var pick=function(a){return a[rnd(a.length)];};
+var clamp=function(v,a,b){return Math.max(a,Math.min(b,v));};
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=rnd(i+1);var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function josa(name,a,b){ // a=받침있음, b=받침없음
+  var c=name.charCodeAt(name.length-1);
+  if(c<0xAC00||c>0xD7A3) return b;
+  return ((c-0xAC00)%28)?a:b;
+}
+function eun(n){return n+josa(n,'은','는');}
+function ie(n){return n+josa(n,'이','가');}
+function eul(n){return n+josa(n,'을','를');}
+
+/* ================= 직업 ================= */
+var ROLES={
+  mafia:{n:'마피아',team:'mafia',e:'🔪',d:'밤마다 1명을 지목해 제거한다. 동료의 정체를 알고 밤에 비밀 채팅을 쓴다.'},
+  police:{n:'경찰',team:'citizen',e:'🔎',d:'밤마다 1명을 조사해 마피아인지 아닌지 확인한다.'},
+  doctor:{n:'의사',team:'citizen',e:'💉',d:'밤마다 1명을 치료한다. 그 밤의 마피아 공격을 1회 막는다. 자가치료 가능.'},
+  soldier:{n:'군인',team:'citizen',e:'🛡️',d:'방탄 1회. 첫 마피아 공격을 자동으로 버틴다. 밤 지목은 없다.'},
+  politician:{n:'정치인',team:'citizen',e:'🎩',d:'투표가 2표로 계산된다(표시는 1표). 투표로는 처형되지 않는다. 승리 판정 머릿수 2.'},
+  medium:{n:'영매',team:'citizen',e:'🔮',d:'사망자들의 채팅을 볼 수 있다. 밤 지목은 없다.'},
+  citizen:{n:'시민',team:'citizen',e:'🧑',d:'능력이 없다. 토론과 투표로 마피아를 찾아낸다.'}
+};
+var ROLE_ORDER=['mafia','police','doctor','soldier','politician','medium','citizen'];
+var NAMES=['지훈','서연','민준','하윤','도윤','예은','시우','채원','건우','수아','지호','나연','현우','유진','서준','다은'];
+var AVS=['🐱','🐶','🦊','🐻','🐼','🐯','🦁','🐸','🐵','🐰','🐨','🐧','🐥','🐢'];
+
+/* ================= 상태 ================= */
+var S=null, ticker=null;
+
+function P(id){for(var i=0;i<S.ps.length;i++){if(S.ps[i].id===id)return S.ps[i];}return null;}
+function nm(id){var p=P(id);return p?p.name:'?';}
+function alive(){return S.ps.filter(function(p){return p.alive;});}
+function aliveAI(){return S.ps.filter(function(p){return p.alive&&!p.isPlayer;});}
+function isAlive(id){var p=P(id);return !!(p&&p.alive);}
+function mates(p){return S.ps.filter(function(q){return q.role==='mafia'&&q.id!==p.id;});}
+function sus(p,t){return (p.ai&&p.ai.sus[t]!=null)?p.ai.sus[t]:30;}
+function bump(p,t,d){
+  if(!p.ai||p.id===t)return;
+  if(p.role==='mafia'&&P(t)&&P(t).role==='mafia'){p.ai.sus[t]=clamp(sus(p,t)+d*0.1,0,18);return;}
+  if(p.ai.known[t]==='clean'){p.ai.sus[t]=clamp(sus(p,t)+d*0.15,0,20);return;}
+  if(p.ai.known[t]==='mafia'){p.ai.sus[t]=98;return;}
+  p.ai.sus[t]=clamp(sus(p,t)+d,0,100);
+}
+function eachAI(f){aliveAI().forEach(f);}
+
+/* ================= 게임 생성 ================= */
+function newGame(nick){
+  var roles=shuffle(['mafia','mafia','police','doctor','soldier','politician','medium','citizen']);
+  var pool=shuffle(NAMES), avs=shuffle(AVS);
+  var meIdx=rnd(8);
+  var ps=[];
+  var ni=0;
+  for(var i=0;i<8;i++){
+    var isMe=(i===meIdx);
+    var name;
+    if(isMe){ name=(nick||'플레이어').slice(0,6)||'플레이어'; }
+    else { name=pool[ni++]; }
+    ps.push({
+      id:i, name:name, av:avs[i], role:roles[i], alive:true, isPlayer:isMe,
+      shield:(roles[i]==='soldier'), claimed:null, revealed:null, ai:null
+    });
+  }
+  // 닉네임 충돌 방지
+  var seen={};
+  ps.forEach(function(p){ while(seen[p.name]) p.name=p.name+'2'; seen[p.name]=1; });
+
+  S={
+    ps:ps, me:ps[meIdx], day:0, phase:'setup', tEnd:0, onEnd:null, sched:[],
+    msgs:[], claims:[], accus:[], pendingReact:null,
+    votes:{}, lastVotes:{}, voteHist:[], poll:{}, playerPoll:null, recent:[], accCount:{},
+    judge:{}, accused:null, target:null, over:false,
+    extendUsed:false, aiExtendUsed:false, pick:{}, aiPicks:{},
+    lastNight:{killed:null,blocked:false}, killedIds:[]
+  };
+  ps.forEach(function(p){
+    if(p.isPlayer)return;
+    var brain={sus:{},known:{},invest:{},threat:{},claim:null,needCounter:false,
+               reacted:0,lines:0,savedInfo:null,shieldInfo:false,extendUsed:false};
+    ps.forEach(function(q){ if(q.id!==p.id) brain.sus[q.id]=18+rnd(18); });
+    p.ai=brain;
+    if(p.role==='mafia'){
+      mates(p).forEach(function(m){ brain.sus[m.id]=2; brain.known[m.id]='mate'; });
+    }
+  });
+  return S;
+}
+
+/* ================= 로그 ================= */
+function visible(m){
+  var me=S.me;
+  if(S.over) return true;
+  if(m.ch==='all'||m.ch==='sys') return true;
+  if(m.ch==='priv') return true;
+  if(m.ch==='mafia') return (me.role==='mafia')||(!me.alive);
+  if(m.ch==='dead') return (!me.alive)||(me.role==='medium'&&me.alive);
+  return true;
+}
+function render1(m){
+  var d=document.createElement('div');
+  if(m.type==='sys'){
+    d.className='sys'+(m.k?' '+m.k:'');
+    d.innerHTML=esc(m.t);
+  }else{
+    var p=P(m.from);
+    d.className='msg'+(m.ch==='mafia'?' mafiaCh':'')+(m.ch==='dead'?' deadCh':'')+(p&&p.isPlayer?' me':'');
+    var tag=m.ch==='mafia'?' <span style="color:#ff4d6d">🔪비밀</span>':(m.ch==='dead'?' <span style="color:#7b849c">💀</span>':'');
+    d.innerHTML='<div class="mav">'+(p?p.av:'❔')+'</div><div class="bd"><div class="who">'+
+      esc(p?p.name:'?')+tag+'</div><div class="tx">'+esc(m.t)+'</div></div>';
+  }
+  return d;
+}
+function push(m){
+  S.msgs.push(m);
+  if(!visible(m))return;
+  var log=$('#log');
+  log.appendChild(render1(m));
+  while(log.children.length>160) log.removeChild(log.firstChild);
+  log.scrollTop=log.scrollHeight;
+}
+function sys(t,k){push({type:'sys',t:t,k:k||'',ch:'sys'});}
+function priv(t){push({type:'sys',t:t,k:'priv',ch:'priv'});}
+function say(p,t,ch){
+  if((ch||'all')==='all'){ S.recent.push(t); if(S.recent.length>12) S.recent.shift(); }
+  push({type:'msg',from:p.id,t:t,ch:ch||'all'});
+}
+function fill(tpl,map){ for(var k in map) tpl=tpl.split('{'+k+'}').join(map[k]); return tpl; }
+function pickFresh(pool,map){
+  var s='',i=0;
+  do{ s=fill(pick(pool),map||{}); i++; }while(S.recent.indexOf(s)>=0&&i<10);
+  return s;
+}
+function redrawLog(){
+  var log=$('#log'); log.innerHTML='';
+  S.msgs.forEach(function(m){ if(visible(m)) log.appendChild(render1(m)); });
+  log.scrollTop=log.scrollHeight;
+}
+
+/* ================= 페이즈 엔진 ================= */
+function sched(ms,fn){
+  var e={t:Date.now()+ms,fn:fn};
+  S.sched.push(e);
+  S.sched.sort(function(a,b){return a.t-b.t;});
+}
+function setPhase(name,label,secs,onEnd){
+  S.phase=name; S.sched=[];
+  S.tEnd=Date.now()+secs*1000; S.onEnd=onEnd;
+  S.mode=null; $('#hintBar').innerHTML='';
+  $('#phaseName').textContent=label;
+  $('#dayNum').textContent=S.day?(S.day+'일차'):'';
+  document.body.className=(name==='night'?'night':'day');
+  S.target=null;
+  renderAll();
+}
+function tick(){
+  if(!S||S.over)return;
+  var now=Date.now();
+  var guard=0;
+  while(S.sched.length&&S.sched[0].t<=now&&guard++<50){
+    var e=S.sched.shift();
+    try{e.fn();}catch(err){console.error(err);}
+  }
+  var rem=Math.max(0,S.tEnd-now);
+  var t=$('#timer');
+  t.textContent=S.onEnd?Math.ceil(rem/1000):'--';
+  t.className=(rem<=5000&&S.onEnd)?'low':'';
+  if(S.phase==='vote') renderRoster();
+  if(rem<=0&&S.onEnd){
+    var f=S.onEnd; S.onEnd=null; S.sched=[];
+    f();
+    if(S&&!S.over){
+      var r2=Math.max(0,S.tEnd-Date.now());
+      t.textContent=S.onEnd?Math.ceil(r2/1000):'--';
+      t.className=(r2<=5000&&S.onEnd)?'low':'';
+    }
+  }
+}
+function skip(){
+  if(!S||S.over||!S.onEnd)return;
+  var guard=0;
+  while(S.sched.length&&guard++<80){
+    var e=S.sched.shift();
+    try{e.fn();}catch(err){console.error(err);}
+  }
+  S.tEnd=Date.now();
+  tick();
+}
+
+/* ================= 주장/지목 반응 ================= */
+function addClaim(by,role){
+  if(S.claims.some(function(c){return c.by===by&&c.role===role;}))return;
+  S.claims.push({by:by,role:role,day:S.day});
+  var bp=P(by); if(bp) bp.claimed=role;
+  eachAI(function(p){
+    if(p.id===by)return;
+    if(p.role===role){ bump(p,by,46); p.ai.needCounter=true; }
+    else bump(p,by,(role==='police'?7:role==='doctor'?5:3));
+    if(p.role==='mafia'&&P(by).role!=='mafia'){
+      p.ai.threat[by]=(p.ai.threat[by]||0)+(role==='police'?65:role==='doctor'?40:role==='soldier'?20:15);
+    }
+  });
+  var dup=S.claims.filter(function(c){return c.role===role&&isAlive(c.by);});
+  if(dup.length>1){
+    dup.forEach(function(c){ eachAI(function(p){ if(p.id!==c.by) bump(p,c.by,16); }); });
+  }
+  S.pendingReact={type:'claim',by:by,role:role};
+  S.pendingReact_id=(S.pendingReact_id||0)+1;
+}
+function addAccuse(by,target,strong){
+  if(!isAlive(target))return;
+  S.accus.push({by:by,target:target,day:S.day,strong:!!strong});
+  S.accCount[target]=(S.accCount[target]||0)+1;
+  var decay=1/(1+0.7*(S.accCount[target]-1));
+  eachAI(function(p){
+    if(p.id===by)return;
+    if(p.id===target){ bump(p,by,15); return; }
+    var trust=clamp(1-sus(p,by)/115,0.12,1);
+    var w=(strong?34:13)*trust*(strong?1:decay);
+    if(p.role==='mafia'&&P(target).role==='mafia') w*=0.15;
+    bump(p,target,w);
+  });
+  var tp=P(target);
+  if(tp&&tp.ai) bump(tp,by,15);
+  S.pendingReact={type:'accuse',by:by,target:target,strong:!!strong};
+  S.pendingReact_id=(S.pendingReact_id||0)+1;
+}
+
+/* ================= AI 발언 ================= */
+var FILL=[
+  '정보가 너무 없네요. 일단 조용한 사람부터 봅시다.',
+  '오늘은 확실한 근거 없으면 넘기는 게 낫지 않아요?',
+  '경찰 있으면 슬슬 나와야 할 것 같은데요.',
+  '저는 아직 판단 보류입니다.',
+  '의사님, 누구 살렸는지 나중에라도 말해줘요.',
+  '말 없는 사람이 제일 무섭습니다.',
+  '괜히 급하게 몰다가 시민 날리지 맙시다.',
+  '지금 분위기가 너무 한쪽으로 쏠리는데요.',
+  '누가 누구한테 투표하는지 잘 봐두세요.',
+  '군인 있으면 굳이 안 나와도 됩니다. 조용히 있어요.',
+  '저는 오늘 표 아끼겠습니다.'
+];
+var FILL2=[
+  '어제 투표 흐름부터 다시 봅시다.',
+  '어제 밤에 죽은 사람 라인부터 정리하죠.',
+  '경찰 아직도 안 나오면 오늘은 답 없습니다.',
+  '어제 표 몰아준 사람들 오늘 말 좀 해봐요.'
+];
+var ACC=[
+  '{t} 아까부터 말이 계속 바뀌는데요?',
+  '{t} 너무 조용하지 않아요? 저는 여기 봅니다.',
+  '{t} 논리가 없는데 남한테만 떠넘기네요.',
+  '저는 {t} 의심합니다. 오늘 {t} 갑시다.',
+  '{t} 지금 물타기 하는 거 아니에요?',
+  '{t} 말투가 계속 애매해요. 저는 {t} 봅니다.',
+  '{t} 아무한테도 안 걸리려고만 하는 게 더 수상해요.',
+  '{t} 오늘 한 말 중에 건진 게 하나도 없어요.',
+  '{t} 한 번만 더 얘기해봐요. 저 지금 {t} 제일 걸립니다.'
+];
+var ACC2=[
+  '{t} 어제 투표가 좀 이상했어요.',
+  '어제 {t} 표 던진 거 다시 봅시다. 저는 못 넘어가요.',
+  '{t} 어제부터 계속 발 빼는 느낌인데요.',
+  '{t} 어제랑 오늘 말이 완전 다른데요?'
+];
+var AGREE=[
+  '{b} 말에 동의합니다. 저도 {t} 걸려요.',
+  '{b} 의견 따라갑니다. 오늘 {t} 봅시다.',
+  '저도 {t} 쪽이 제일 이상해 보여요.',
+  '{b} 짚은 거 괜찮네요. {t} 한 번 더 봐야겠어요.'
+];
+var DISAGREE=[
+  '{b} 왜 {t}만 몰아요? 근거가 약한데요.',
+  '{t} 몰기 전에 {b} 본인 얘기부터 해봐요.',
+  '{b} 좀 성급한 것 같은데요. 저는 아직 모르겠어요.',
+  '{b} 그렇게 확신하는 근거가 뭔데요?'
+];
+var DEF=[
+  '저 아닙니다. 진짜로 시민이에요.',
+  '저 죽이면 오늘 밤 후회할 겁니다.',
+  '왜 저예요? 근거를 대봐요.',
+  '저 말고 {t} 보세요. 훨씬 이상합니다.',
+  '저 여기서 나가면 마피아만 좋습니다.',
+  '저한테 표 쓰는 거 진짜 아깝습니다.',
+  '저 잡아봐야 오늘 밤에 또 한 명 죽어요.'
+];
+
+function aiSpeech(p){
+  var a=p.ai;
+  var others=alive().filter(function(x){return x.id!==p.id;});
+  if(!others.length)return null;
+  var sorted=others.slice().sort(function(x,y){return sus(p,y.id)-sus(p,x.id);});
+  var top=sorted[0], low=sorted[sorted.length-1];
+
+  // 1) 내 직업을 사칭당함 -> 반박
+  if(a.needCounter&&p.role!=='mafia'&&p.role!=='citizen'){
+    a.needCounter=false;
+    var fk=S.claims.filter(function(c){return c.role===p.role&&c.by!==p.id&&isAlive(c.by);});
+    if(fk.length){
+      var f=fk[fk.length-1].by;
+      bump(p,f,40);
+      a.claim=p.role; addClaim(p.id,p.role);
+      if(p.role==='police'){
+        var hit=null;
+        for(var k in a.invest){ if(a.invest[k]==='mafia'&&isAlive(+k)) hit=+k; }
+        if(hit!=null){ addAccuse(p.id,hit,true);
+          return '제가 진짜 경찰입니다. '+nm(f)+' 사칭이에요. 제 조사로 '+eun(nm(hit))+' 마피아입니다.'; }
+        return '제가 진짜 경찰입니다. '+eun(nm(f))+' 사칭이에요. 저 죽이면 밤에 답 없습니다.';
+      }
+      return '제가 진짜 '+ROLES[p.role].n+'입니다. '+eun(nm(f))+' 사칭이에요.';
+    }
+  }
+
+  // 2) 플레이어/타인 주장에 대한 반응
+  if(S.pendingReact&&a.reacted!==S.pendingReact_id){
+    var r=S.pendingReact;
+    if(r.by!==p.id&&isAlive(r.by)&&(r.type==='claim'||r.strong||Math.random()<0.4)){
+      a.reacted=S.pendingReact_id;
+      S.pendingReact=null;
+      if(r.type==='claim'){
+        if(p.role==='mafia'&&(r.role==='police'||r.role==='doctor')){
+          a.threat[r.by]=(a.threat[r.by]||0)+50;
+          return nm(r.by)+' '+ROLES[r.role].n+'이라고요? 그럼 어제 결과부터 말해봐요. 저는 못 믿겠는데요.';
+        }
+        if(sus(p,r.by)<42){
+          bump(p,r.by,-8);
+          return nm(r.by)+' '+ROLES[r.role].n+' 주장 일단 믿어봅니다. 사칭이면 내일 바로 갑니다.';
+        }
+        bump(p,r.by,10);
+        return nm(r.by)+' 갑자기 커밍아웃이요? 타이밍이 너무 급한데요.';
+      }
+      if(r.type==='accuse'&&isAlive(r.target)){
+        if(r.target===p.id){
+          bump(p,r.by,18);
+          return pickFresh(['저요? '+nm(r.by)+' 근거 없이 찍는 거 보니 본인이 더 수상한데요.',
+            '갑자기 저요? '+nm(r.by)+' 그쪽이 더 설명해야 하는 거 아니에요?',
+            nm(r.by)+' 저 찍는 이유가 뭔데요? 말이 안 되잖아요.']);
+        }
+        if(p.role==='mafia'&&P(r.target).role==='mafia'){
+          bump(p,r.by,6);
+          return pickFresh(DISAGREE,{b:nm(r.by),t:nm(r.target)});
+        }
+        if(sus(p,r.by)<40&&sus(p,r.target)>=34){
+          bump(p,r.target,8);
+          return pickFresh(AGREE,{b:nm(r.by),t:nm(r.target)});
+        }
+        bump(p,r.by,6);
+        return pickFresh(DISAGREE,{b:nm(r.by),t:nm(r.target)});
+      }
+    }else if(r.by!==p.id&&isAlive(r.by)){
+      a.reacted=S.pendingReact_id;
+    }
+  }
+
+  // 3) 경찰 커밍아웃
+  if(p.role==='police'){
+    var hit2=null,clean=[];
+    for(var k2 in a.invest){
+      if(!isAlive(+k2))continue;
+      if(a.invest[k2]==='mafia') hit2=+k2; else clean.push(+k2);
+    }
+    if(hit2!=null&&a.claim!=='police'&&Math.random()<0.9){
+      a.claim='police'; addClaim(p.id,'police'); addAccuse(p.id,hit2,true);
+      return '저 경찰입니다. '+eun(nm(hit2))+' 마피아 확정이에요. 오늘 '+nm(hit2)+' 갑시다.';
+    }
+    if(a.claim==='police'&&hit2!=null&&Math.random()<0.5){
+      return '다시 말합니다. '+eun(nm(hit2))+' 마피아입니다. 여기서 흔들리면 집니다.';
+    }
+    if(a.claim!=='police'&&S.day>=3&&clean.length&&Math.random()<0.45){
+      a.claim='police'; addClaim(p.id,'police');
+      return '저 경찰입니다. '+eun(nm(clean[0]))+' 시민 확인했어요. 나머지에서 찾읍시다.';
+    }
+    if(a.claim==='police'&&clean.length&&Math.random()<0.4){
+      return eun(nm(clean[0]))+' 제가 시민 확인했습니다. 그쪽은 빼고 봅시다.';
+    }
+  }
+
+  // 4) 의사 / 군인 정보 공개
+  if(p.role==='doctor'&&a.savedInfo!=null&&a.claim!=='doctor'&&Math.random()<0.7){
+    a.claim='doctor'; addClaim(p.id,'doctor');
+    var sv=a.savedInfo; a.savedInfo=null;
+    return '저 의사입니다. 어젯밤 '+eul(nm(sv))+' 살렸어요. '+nm(sv)+' 시민 확정입니다.';
+  }
+  if(p.role==='soldier'&&a.shieldInfo&&a.claim!=='soldier'&&Math.random()<0.75){
+    a.claim='soldier'; a.shieldInfo=false; addClaim(p.id,'soldier');
+    return '저 군인입니다. 어젯밤 방탄 썼어요. 이제 저 한 번 더 맞으면 죽습니다.';
+  }
+
+  // 5) 마피아 물타기 / 역커밍아웃
+  if(p.role==='mafia'){
+    var pol=S.claims.filter(function(c){return c.role==='police'&&isAlive(c.by)&&P(c.by).role!=='mafia';});
+    var pressure=(S.lastVoteCount&&S.lastVoteCount[p.id])||0;
+    if(pol.length&&a.claim!=='police'&&pressure>=2&&Math.random()<0.5){
+      a.claim='police'; addClaim(p.id,'police');
+      var vt=others.filter(function(x){return x.role!=='mafia';});
+      var fake=vt.length?pick(vt):top;
+      addAccuse(p.id,fake.id,true);
+      return '저 진짜 경찰입니다. '+eun(nm(pol[0].by))+' 사칭이고, '+eun(fake.name)+' 마피아예요.';
+    }
+    var mate=others.filter(function(x){return x.role==='mafia';})[0];
+    if(mate&&(S.lastVoteCount&&S.lastVoteCount[mate.id]>=2)&&Math.random()<0.5){
+      eachAI(function(q){ if(q.id!==p.id&&q.role!=='mafia') bump(q,mate.id,-7); });
+      return pickFresh([eun(mate.name)+' 저는 좀 아닌 것 같은데요. 다른 데 봅시다.',
+        eun(mate.name)+' 어제부터 말은 제일 정상이었어요.',
+        eul(mate.name)+' 지금 치는 건 너무 쉬운 선택 같은데요.']);
+    }
+    var cand=others.filter(function(x){return x.role!=='mafia';})
+      .sort(function(x,y){return (a.threat[y.id]||0)+sus(p,y.id)-((a.threat[x.id]||0)+sus(p,x.id));});
+    var tgt=cand[0];
+    if(tgt&&a.lastAcc===tgt.id&&cand.length>1&&Math.random()<0.5) tgt=cand[1];
+    if(tgt&&Math.random()<0.7){
+      a.lastAcc=tgt.id;
+      addAccuse(p.id,tgt.id,false);
+      return pickFresh(S.day>=2&&Math.random()<0.4?ACC2:ACC,{t:tgt.name});
+    }
+  }
+
+  // 6) 내가 몰리는 중이면 변호
+  var onMe=(S.lastVoteCount&&S.lastVoteCount[p.id])||0;
+  if(onMe>=2&&Math.random()<0.6){
+    return pickFresh(DEF,{t:top.name});
+  }
+
+  // 7) 기본 지목
+  if(sus(p,top.id)>=38&&Math.random()<0.7){
+    var t2=top;
+    if(a.lastAcc===top.id&&sorted.length>1&&Math.random()<0.55) t2=sorted[1];
+    if(sus(p,t2.id)>=30){
+      a.lastAcc=t2.id;
+      addAccuse(p.id,t2.id,false);
+      return pickFresh(S.day>=2&&Math.random()<0.4?ACC2:ACC,{t:t2.name});
+    }
+  }
+  if(low&&sus(p,low.id)<20&&Math.random()<0.28){
+    return pickFresh([eun(low.name)+' 저는 좀 믿어요. 다른 데서 찾읍시다.',
+      eun(low.name)+' 지금까지 말은 제일 깔끔했어요.',
+      '적어도 '+eun(low.name)+' 오늘은 아니라고 봅니다.']);
+  }
+  return pickFresh(S.day>=2?FILL.concat(FILL2):FILL);
+}
+
+/* ================= 밤 ================= */
+function startNight(){
+  S.day++;
+  S.votes={}; S.poll={}; S.playerPoll=null; S.judge={};
+  S.accused=null; S.extendUsed=false; S.aiExtendUsed=false;
+  S.pick={}; S.aiPicks={}; S.accCount={};
+  sys('― '+S.day+'일차 밤 ―','hr');
+  sys('밤이 되었습니다. 모두 눈을 감아 주세요.');
+
+  setPhase('night','밤',25,endNight);
+
+  // AI 밤 결정
+  decideAINight();
+
+  // 마피아 비밀 채팅
+  var mfs=alive().filter(function(p){return p.role==='mafia';});
+  var aiMf=mfs.filter(function(p){return !p.isPlayer;});
+  if(S.me.role==='mafia'&&S.me.alive){
+    var t=1100;
+    aiMf.forEach(function(m){
+      var tg=S.aiPicks.kill;
+      sched(t,function(){
+        if(!isAlive(m.id))return;
+        say(m,'오늘은 '+eul(nm(tg))+' 봅시다. 괜찮죠?','mafia');
+      });
+      t+=2400;
+    });
+    if(aiMf.length===0) sched(1200,function(){ sys('혼자 남은 밤입니다. 대상을 고르세요.'); });
+  }else if(aiMf.length>1){
+    // 플레이어가 마피아가 아니면 비밀채팅은 사망자에게만 노출됨
+    var t2=1200;
+    sched(t2,function(){
+      if(aiMf.length<2)return;
+      say(aiMf[0],eul(nm(S.aiPicks.kill))+' 정리하죠.','mafia');
+    });
+    sched(t2+2000,function(){
+      if(aiMf.length<2)return;
+      say(aiMf[1],'좋아요. 낮에는 서로 모르는 척합시다.','mafia');
+    });
+  }
+  // 사망자 잡담
+  var deads=S.ps.filter(function(p){return !p.alive&&!p.isPlayer;});
+  if(deads.length&&Math.random()<0.7){
+    sched(3200+rnd(4000),function(){
+      var d=pick(deads);
+      say(d,pick(['아... 억울해 죽겠네.','살아있는 사람들 눈이 삐었나?','영매님 보고 있으면 잘 좀 봐줘요.','내가 말한 거 왜 안 믿냐고.']),'dead');
+    });
+  }
+}
+function decideAINight(){
+  // 마피아 표적
+  var mfs=alive().filter(function(p){return p.role==='mafia';});
+  var aiMf=mfs.filter(function(p){return !p.isPlayer;});
+  var cands=alive().filter(function(p){return p.role!=='mafia';});
+  if(cands.length){
+    var scored=cands.map(function(c){
+      var sc=10+rnd(22);
+      aiMf.forEach(function(m){ sc+=(m.ai.threat[c.id]||0)*0.7; });
+      if(c.claimed==='police') sc+=(Math.random()<0.75?70:14);
+      if(c.claimed==='doctor') sc+=45;
+      if(c.revealed==='politician') sc+=25;
+      if(c.claimed==='soldier') sc-=15;
+      return {id:c.id,sc:sc};
+    }).sort(function(a,b){return b.sc-a.sc;});
+    S.aiPicks.kill=scored[0].id;
+  }
+  // 경찰
+  alive().forEach(function(p){
+    if(p.isPlayer||!p.ai)return;
+    if(p.role==='police'){
+      var c=alive().filter(function(x){return x.id!==p.id&&p.ai.invest[x.id]==null;});
+      if(!c.length)c=alive().filter(function(x){return x.id!==p.id;});
+      c.sort(function(x,y){return sus(p,y.id)-sus(p,x.id);});
+      var t=(c.length>1&&Math.random()<0.3)?c[1]:c[0];
+      if(t) S.aiPicks['inv'+p.id]=t.id;
+    }
+    if(p.role==='doctor'){
+      var pc=alive().filter(function(x){return x.claimed==='police';});
+      var t2;
+      if(pc.length&&Math.random()<0.62) t2=pc[0];
+      else if(Math.random()<0.3) t2=p;
+      else {
+        var safe=alive().filter(function(x){return sus(p,x.id)<40;});
+        t2=safe.length?pick(safe):pick(alive());
+      }
+      S.aiPicks['heal'+p.id]=t2.id;
+    }
+  });
+}
+function endNight(){
+  // 플레이어 능력 반영
+  var killT=null;
+  var mfAlive=alive().filter(function(p){return p.role==='mafia';});
+  if(mfAlive.length){
+    if(S.me.role==='mafia'&&S.me.alive&&S.pick.kill!=null&&isAlive(S.pick.kill)) killT=S.pick.kill;
+    else if(S.aiPicks.kill!=null&&isAlive(S.aiPicks.kill)) killT=S.aiPicks.kill;
+    else {
+      var c=alive().filter(function(p){return p.role!=='mafia';});
+      killT=c.length?pick(c).id:null;
+    }
+  }
+  // 치료 목록
+  var heals={};
+  alive().forEach(function(p){
+    if(p.role!=='doctor')return;
+    var h=p.isPlayer?S.pick.heal:S.aiPicks['heal'+p.id];
+    if(h!=null&&isAlive(h)) heals[h]=p.id;
+  });
+  // 조사
+  alive().forEach(function(p){
+    if(p.role!=='police')return;
+    var t=p.isPlayer?S.pick.inv:S.aiPicks['inv'+p.id];
+    if(t==null||!isAlive(t))return;
+    var res=(P(t).role==='mafia')?'mafia':'clean';
+    if(p.isPlayer){
+      S.pendingPriv='조사 결과 — '+eun(nm(t))+((res==='mafia')?' 마피아입니다. 🔪':' 마피아가 아닙니다.');
+    }else{
+      p.ai.invest[t]=res;
+      p.ai.known[t]=res;
+      p.ai.sus[t]=(res==='mafia')?98:3;
+    }
+  });
+
+  var killed=null, blocked=false, shieldUsed=false, savedBy=null;
+  if(killT!=null){
+    var tp=P(killT);
+    if(heals[killT]!=null){ blocked=true; savedBy=heals[killT]; }
+    else if(tp.role==='soldier'&&tp.shield){ tp.shield=false; blocked=true; shieldUsed=true; }
+    else { tp.alive=false; killed=killT; S.killedIds.push(killT); }
+  }
+  S.lastNight={killed:killed,blocked:blocked,target:killT};
+
+  // 의사/군인 정보 (본인만)
+  if(blocked&&savedBy!=null){
+    var dp=P(savedBy);
+    if(dp.isPlayer) S.pendingPriv2='당신의 치료로 '+ie(nm(killT))+' 살았습니다.';
+    else dp.ai.savedInfo=killT;
+  }
+  if(shieldUsed){
+    var sp=P(killT);
+    if(sp.isPlayer) S.pendingPriv2='방탄이 발동했습니다. 다음 공격은 막지 못합니다.';
+    else sp.ai.shieldInfo=true;
+  }
+  startResult();
+}
+
+/* ================= 결과 발표 ================= */
+function startResult(){
+  setPhase('result','결과 발표',4,function(){
+    if(checkWin())return;
+    startDiscuss();
+  });
+  sys('― '+S.day+'일차 아침 ―','hr');
+  var k=S.lastNight.killed;
+  if(k!=null){
+    sys(nm(k)+'님이 사망했습니다.','bad');
+    if(k===S.me.id) sched(400,function(){ priv('당신은 사망했습니다. 이제 사망자 채팅만 가능합니다.'); });
+  }else{
+    sys('조용하게 밤이 지나갔습니다.','big');
+  }
+  if(S.pendingPriv){ priv(S.pendingPriv); S.pendingPriv=null; }
+  if(S.pendingPriv2){ priv(S.pendingPriv2); S.pendingPriv2=null; }
+  // 사망자 반응 + 의심도 갱신
+  if(k!=null){
+    eachAI(function(p){
+      // 죽은 사람을 어제 강하게 변호한 사람은 조금 신뢰
+      S.accus.filter(function(a){return a.target===k&&a.day===S.day-1;}).forEach(function(a){
+        if(isAlive(a.by)) bump(p,a.by,10);
+      });
+    });
+    var dp=P(k);
+    if(!dp.isPlayer){
+      sched(1500,function(){
+        say(dp,pick(['아 진짜 어이없네. 나 시민이었는데.','내 말 좀 믿지 그랬어.','잘 좀 찾아봐라 진짜.']),'dead');
+      });
+    }
+  }
+}
+
+/* ================= 토론 ================= */
+function startDiscuss(){
+  var n=alive().length;
+  var dur=n*15;
+  S.discussEnd=dur;
+  setPhase('discuss','토론',dur,startVote);
+  sys('토론 시간입니다. ('+dur+'초) 자유롭게 대화하세요.');
+  planDiscuss(dur*1000);
+}
+function planDiscuss(durMs){
+  var speakers=aliveAI();
+  if(!speakers.length)return;
+  var order=[];
+  var maxLines=Math.max(4,Math.round(durMs/4000));
+  while(order.length<maxLines) shuffle(speakers).forEach(function(p){order.push(p);});
+  var t=1000;
+  for(var i=0;i<order.length;i++){
+    if(t>durMs-700)break;
+    (function(p){
+      sched(t,function(){
+        if(!isAlive(p.id)||S.phase!=='discuss')return;
+        var s=aiSpeech(p);
+        if(s) say(p,s,'all');
+      });
+    })(order[i]);
+    t+=2600+rnd(2600);
+  }
+  // AI 여론조사
+  sched(Math.min(durMs*0.55,durMs-1500),function(){
+    if(S.phase!=='discuss')return;
+    aliveAI().forEach(function(p){
+      if(Math.random()<0.75){
+        var o=alive().filter(function(x){return x.id!==p.id;})
+          .sort(function(x,y){return sus(p,y.id)-sus(p,x.id);});
+        if(o.length) S.poll[p.id]=o[0].id;
+      }
+    });
+    renderRoster();
+  });
+  // AI 시간 조절
+  if(Math.random()<0.5){
+    sched(2500+rnd(3000),function(){
+      if(S.phase!=='discuss'||S.aiExtendUsed)return;
+      S.aiExtendUsed=true;
+      var who=aliveAI(); if(!who.length)return;
+      var w=pick(who);
+      var ext=Math.random()<0.6;
+      S.tEnd+=(ext?15000:-15000);
+      if(S.tEnd<Date.now()+3000) S.tEnd=Date.now()+3000;
+      sys(nm(w.id)+'님이 토론 시간을 '+(ext?'15초 연장':'15초 단축')+'했습니다.');
+    });
+  }
+  // 사망자 잡담
+  var deads=S.ps.filter(function(p){return !p.alive&&!p.isPlayer;});
+  if(deads.length&&Math.random()<0.6){
+    sched(4000+rnd(6000),function(){
+      if(S.phase!=='discuss')return;
+      var d=pick(deads);
+      var liv=alive();
+      if(!liv.length)return;
+      say(d,pick(['저기 저 사람 진짜 아닌데.','산 사람들 답답하다 진짜.',eun(nm(pick(liv).id))+' 좀 봐봐.']),'dead');
+    });
+  }
+}
+
+/* ================= 투표 ================= */
+function startVote(){
+  S.votes={};
+  setPhase('vote','투표',15,endVote);
+  sys('투표 시간입니다. (15초) 종료 5초 전부터 득표가 비공개됩니다.');
+  var aiv=aliveAI();
+  aiv.forEach(function(p){
+    sched(1200+rnd(6000),function(){
+      if(S.phase!=='vote'||!isAlive(p.id))return;
+      S.votes[p.id]=aiVoteTarget(p);
+      renderRoster();
+    });
+    if(Math.random()<0.35){
+      sched(8000+rnd(4000),function(){
+        if(S.phase!=='vote'||!isAlive(p.id))return;
+        S.votes[p.id]=aiVoteTarget(p);
+        renderRoster();
+      });
+    }
+  });
+}
+function aiVoteTarget(p){
+  var a=p.ai;
+  var o=alive().filter(function(x){return x.id!==p.id;});
+  if(!o.length)return p.id;
+  var tally=voteTally(false);
+  var best=null,bs=-1e9;
+  o.forEach(function(x){
+    var sc=sus(p,x.id)+ (tally[x.id]||0)*7 + rnd(12);
+    if(p.role==='mafia'){
+      if(x.role==='mafia') sc=-999;
+      else sc+= (a.threat[x.id]||0)*0.5;
+    }
+    if(a.known[x.id]==='clean') sc-=60;
+    if(a.known[x.id]==='mafia') sc+=120;
+    if(sc>bs){bs=sc;best=x.id;}
+  });
+  return best;
+}
+function voteTally(weighted){
+  var t={};
+  for(var v in S.votes){
+    var tgt=S.votes[v];
+    if(tgt==null||!isAlive(tgt))continue;
+    var w=1;
+    if(weighted){ var vp=P(+v); if(vp&&vp.role==='politician') w=2; }
+    t[tgt]=(t[tgt]||0)+w;
+  }
+  return t;
+}
+function endVote(){
+  var shown=voteTally(false), weighted=voteTally(true);
+  S.lastVoteCount=shown;
+  var lines=[];
+  Object.keys(shown).sort(function(a,b){return shown[b]-shown[a];}).forEach(function(id){
+    lines.push(nm(+id)+' '+shown[id]+'표');
+  });
+  sys(lines.length?('투표 결과 — '+lines.join(' / ')):'아무도 투표하지 않았습니다.');
+
+  // 의심도 갱신 (누가 누구에게 투표했는지는 결과 발표 시 공개)
+  eachAI(function(p){
+    for(var v in S.votes){
+      var vi=+v, t=S.votes[v];
+      if(vi===p.id||!isAlive(vi))continue;
+      if(t===p.id){ bump(p,vi,13); continue; }
+      if(sus(p,t)>=55) bump(p,vi,-7);
+      else if(sus(p,t)<=22) bump(p,vi,8);
+    }
+  });
+  S.lastVotes={}; for(var v2 in S.votes) S.lastVotes[v2]=S.votes[v2];
+  S.voteHist.push(S.lastVotes);
+
+  var max=-1,tops=[];
+  for(var id in weighted){
+    if(weighted[id]>max){max=weighted[id];tops=[+id];}
+    else if(weighted[id]===max)tops.push(+id);
+  }
+  if(max<=0||tops.length!==1){
+    sys(tops.length>1?'동률입니다. 오늘은 처형 없이 넘어갑니다.':'처형 없이 밤으로 넘어갑니다.');
+    setPhase('gap','정리',2.5,function(){ if(!checkWin()) startNight(); });
+    return;
+  }
+  S.accused=tops[0];
+  startDefense();
+}
+
+/* ================= 최후의 반론 ================= */
+function startDefense(){
+  setPhase('defense','최후의 반론',15,startJudge);
+  sys(nm(S.accused)+'님이 최다 득표로 지목되었습니다. 최후의 반론 (15초)','big');
+  var ap=P(S.accused);
+  if(!ap.isPlayer){
+    var others=alive().filter(function(x){return x.id!==ap.id;});
+    var top=others.sort(function(x,y){return sus(ap,y.id)-sus(ap,x.id);})[0];
+    var l1,l2;
+    if(ap.role==='mafia'){
+      l1=pick(['저 진짜 시민입니다. 여기서 저 죽이면 그냥 지는 거예요.',
+               '왜 저예요? 근거 하나도 없잖아요.',
+               '저 나가면 내일 아무 정보도 안 남습니다.']);
+      l2=top?('차라리 '+eul(top.name)+' 보세요. 아까부터 계속 물타기잖아요.'):'제발 다시 생각해요.';
+    }else if(ap.role==='police'&&ap.ai&&ap.ai.claim!=='police'){
+      ap.ai.claim='police'; addClaim(ap.id,'police');
+      var hit=null;
+      for(var k in ap.ai.invest){ if(ap.ai.invest[k]==='mafia'&&isAlive(+k)) hit=+k; }
+      l1='말 안 하려고 했는데, 저 경찰입니다.';
+      l2=hit!=null?(eun(nm(hit))+' 마피아 확정입니다. 저 죽이지 마세요.'):'저 죽이면 조사 끊깁니다. 제발요.';
+      if(hit!=null) addAccuse(ap.id,hit,true);
+    }else if(ap.role==='politician'){
+      l1='저 정치인입니다. 어차피 저는 처형 안 됩니다.';
+      l2='표 낭비하지 말고 다른 데 보세요.';
+      ap.revealed='politician';
+    }else{
+      l1=pick(DEF).replace(/\{t\}/g,top?top.name:'저쪽');
+      l2=top?(eun(top.name)+' 훨씬 이상해요. 저 말고 저쪽 봐요.'):'저 아닙니다. 진짜로.';
+    }
+    sched(1400,function(){ if(S.phase==='defense') say(ap,l1,'all'); });
+    sched(4200,function(){ if(S.phase==='defense') say(ap,l2,'all'); });
+  }else{
+    sys('당신이 지목되었습니다. 변론하세요.','big');
+  }
+}
+
+/* ================= 찬반 투표 ================= */
+function startJudge(){
+  S.judge={};
+  setPhase('judge','찬반 투표',5,endJudge);
+  sys(nm(S.accused)+'님을 처형할까요? (5초) 찬성/반대는 비공개입니다.');
+  aliveAI().forEach(function(p){
+    if(p.id===S.accused)return;
+    sched(400+rnd(3200),function(){
+      if(S.phase!=='judge'||!isAlive(p.id))return;
+      S.judge[p.id]=aiJudge(p);
+    });
+  });
+}
+function aiJudge(p){
+  var ac=P(S.accused);
+  var a=p.ai;
+  if(a.known[ac.id]==='mafia')return true;
+  if(a.known[ac.id]==='clean')return false;
+  if(p.role==='mafia'){
+    if(ac.role==='mafia')return false;
+    if((a.threat[ac.id]||0)>25)return true;
+    return Math.random()<0.62;
+  }
+  var s=sus(p,ac.id);
+  if(S.lastVotes[p.id]===ac.id)s+=18;
+  return s>=46||(s>=34&&Math.random()<0.4);
+}
+function endJudge(){
+  var yes=0,no=0;
+  alive().forEach(function(p){
+    if(p.id===S.accused)return;
+    var v=S.judge[p.id];
+    if(v==null)return;
+    var w=(p.role==='politician')?2:1;
+    if(v)yes+=w;else no+=w;
+  });
+  sys('찬성 '+yes+'표 / 반대 '+no+'표');
+  var ap=P(S.accused);
+  var exec=(yes>0||no>0)&&(yes>=no);
+  if(exec&&ap.role==='politician'){
+    ap.revealed='politician';
+    sys(eun(ap.name)+' 정치인입니다. 투표로는 처형되지 않습니다.','big');
+    eachAI(function(p){ if(p.id!==ap.id){ p.ai.known[ap.id]='clean'; p.ai.sus[ap.id]=5; } });
+    exec=false;
+  }
+  if(exec){
+    ap.alive=false; S.killedIds.push(ap.id);
+    sys(ap.name+'님이 처형되었습니다.','bad');
+    if(ap.isPlayer) priv('당신은 처형되었습니다. 이제 사망자 채팅만 가능합니다.');
+    else sched(1400,function(){ say(ap,pick(['아 진짜 억울하다.','내가 그렇게 말했는데도...','두고 봐라 오늘 밤에 알게 될 거다.']),'dead'); });
+    // 처형된 사람을 강하게 밀었던 사람들의 신뢰도 조정은 다음 밤 결과로 자연스럽게
+  }else{
+    sys(eun(ap.name)+' 생존했습니다.');
+    eachAI(function(p){ if(p.id!==ap.id) bump(p,ap.id,-4); });
+  }
+  setPhase('gap','정리',2.5,function(){
+    if(checkWin())return;
+    startNight();
+  });
+}
+
+/* ================= 승리 판정 ================= */
+function checkWin(){
+  var mf=alive().filter(function(p){return p.role==='mafia';}).length;
+  var ct=0;
+  alive().forEach(function(p){ if(p.role!=='mafia') ct+=(p.role==='politician'?2:1); });
+  if(mf>=ct){ gameOver('mafia'); return true; }
+  if(mf===0){ gameOver('citizen'); return true; }
+  return false;
+}
+function gameOver(team){
+  S.over=true; S.onEnd=null; S.sched=[]; S.phase='end';
+  document.body.className='over';
+  $('#phaseName').textContent='게임 종료';
+  $('#timer').textContent='--';
+  redrawLog();
+  sys('― 게임 종료 ―','hr');
+  sys(team==='mafia'?'마피아팀 승리':'시민팀 승리','big');
+  var win=(ROLES[S.me.role].team===team);
+  var t=$('#endTitle');
+  t.textContent=win?'승리!':'패배...';
+  t.className='big '+(win?'win':'lose');
+  $('#endDesc').innerHTML=(team==='mafia'?'<b>마피아팀</b>이 승리했습니다.':'<b>시민팀</b>이 승리했습니다.')+
+    '<br>당신의 직업: <b>'+ROLES[S.me.role].e+' '+ROLES[S.me.role].n+'</b>';
+  var ul=$('#endList'); ul.innerHTML='';
+  S.ps.forEach(function(p){
+    var li=document.createElement('li');
+    li.className=(p.isPlayer?'mine ':'')+(p.alive?'':'gone');
+    li.innerHTML='<span class="e">'+p.av+'</span><span class="n">'+esc(p.name)+(p.isPlayer?' (나)':'')+
+      (p.alive?'':' 💀')+'</span><span class="r '+ROLES[p.role].team+'">'+ROLES[p.role].e+' '+ROLES[p.role].n+'</span>';
+    ul.appendChild(li);
+  });
+  renderAll();
+  $('#endSheet').classList.add('show');
+}
+
+/* ================= 렌더 ================= */
+function renderRoster(){
+  var r=$('#roster');
+  var showRoles=S.over;
+  var meMafia=(S.me.role==='mafia');
+  var tally=(S.phase==='vote')?voteTally(false):null;
+  var hideT=(S.phase==='vote'&&S.onEnd&&(S.tEnd-Date.now())<=5000);
+  var pollT={};
+  if(S.phase==='discuss'){
+    for(var k in S.poll){ var t=S.poll[k]; if(isAlive(t)) pollT[t]=(pollT[t]||0)+1; }
+    if(S.playerPoll!=null&&isAlive(S.playerPoll)) pollT[S.playerPoll]=(pollT[S.playerPoll]||0)+1;
+  }
+  r.innerHTML='';
+  S.ps.forEach(function(p){
+    var d=document.createElement('div');
+    var cls='pc';
+    if(p.isPlayer)cls+=' me';
+    if(!p.alive)cls+=' dead';
+    if(!p.isPlayer&&p.alive&&meMafia&&p.role==='mafia'&&S.me.alive)cls+=' mate';
+    if(S.target===p.id)cls+=' sel';
+    var pickable=canPick(p);
+    if(pickable)cls+=' pick';
+    d.className=cls;
+    var sub='';
+    if(showRoles) sub=ROLES[p.role].e+' '+ROLES[p.role].n;
+    else if(p.isPlayer) sub=ROLES[p.role].e+' '+ROLES[p.role].n;
+    else if(meMafia&&S.me.alive&&p.role==='mafia') sub='🔪 동료';
+    else if(!p.alive) sub='사망';
+    else if(p.claimed) sub='"'+ROLES[p.claimed].n+'"';
+    else if(p.revealed==='politician') sub='🎩 정치인';
+    var badge='';
+    if(!p.alive) badge='<span class="badge x">✕</span>';
+    else if(tally){ badge=hideT?'<span class="badge">?</span>':(tally[p.id]?'<span class="badge">'+tally[p.id]+'</span>':''); }
+    else if(S.phase==='discuss'&&pollT[p.id]) badge='<span class="badge poll">'+pollT[p.id]+'</span>';
+    d.innerHTML='<span class="av">'+p.av+'</span><span class="nm">'+esc(p.name)+'</span><span class="rl">'+esc(sub)+'</span>'+badge;
+    if(pickable) d.onclick=function(){ onPick(p); };
+    r.appendChild(d);
+  });
+}
+function canPick(p){
+  if(S.over)return false;
+  var me=S.me;
+  if(!me.alive)return false;
+  if(!S.mode)return false;
+  if(S.mode==='heal') return p.alive;
+  if(!p.alive)return false;
+  if(S.mode==='kill') return p.id!==me.id&&p.role!=='mafia';
+  if(S.mode==='inv') return p.id!==me.id;
+  if(S.mode==='vote') return true;
+  if(S.mode==='poll') return p.id!==me.id;
+  if(S.mode==='accuse') return p.id!==me.id;
+  return false;
+}
+function onPick(p){
+  var m=S.mode;
+  if(m==='kill'){ S.pick.kill=p.id; S.target=p.id; hint('제거 대상: <b>'+esc(p.name)+'</b>'); say(S.me,eul(p.name)+' 지목합니다.','mafia'); }
+  else if(m==='inv'){ S.pick.inv=p.id; S.target=p.id; hint('조사 대상: <b>'+esc(p.name)+'</b> — 아침에 결과가 나옵니다.'); }
+  else if(m==='heal'){ S.pick.heal=p.id; S.target=p.id; hint('치료 대상: <b>'+esc(p.name)+'</b>'); }
+  else if(m==='vote'){ S.votes[S.me.id]=p.id; S.target=p.id; hint('투표: <b>'+esc(p.name)+'</b> (변경 가능)'); }
+  else if(m==='poll'){ S.playerPoll=p.id; S.mode=null; hint('여론조사에 <b>'+esc(p.name)+'</b> 지목'); }
+  else if(m==='accuse'){
+    S.mode=null;
+    say(S.me,eun(p.name)+' 마피아 같습니다.','all');
+    addAccuse(S.me.id,p.id,S.me.claimed==='police');
+  }
+  renderRoster(); renderActions();
+}
+function hint(html){ $('#hintBar').innerHTML=html; }
+
+function renderActions(){
+  var a=$('#actions'); a.innerHTML='';
+  var me=S.me;
+  function btn(label,fn,cls,dis){
+    var b=document.createElement('button');
+    b.className='ab'+(cls?' '+cls:''); b.textContent=label;
+    if(dis)b.disabled=true; else b.onclick=fn;
+    a.appendChild(b); return b;
+  }
+  if(S.over)return;
+  if(!me.alive){
+    hint('💀 사망 — 사망자 채팅으로 관전합니다. 게임은 끝까지 진행됩니다.');
+    return;
+  }
+  if(S.phase==='night'){
+    if(me.role==='mafia'){
+      btn(S.pick.kill!=null?('대상: '+nm(S.pick.kill)):'제거 대상 선택',function(){ S.mode='kill'; hint('명단에서 제거할 사람을 고르세요.'); renderRoster(); renderActions(); },S.mode==='kill'?'on':'');
+      if(!S.mode&&S.pick.kill==null) hint('🔪 밤 — 제거할 대상을 고르고, 비밀 채팅으로 동료와 상의하세요.');
+    }else if(me.role==='police'){
+      btn(S.pick.inv!=null?('조사: '+nm(S.pick.inv)):'조사 대상 선택',function(){ S.mode='inv'; hint('조사할 사람을 고르세요.'); renderRoster(); renderActions(); },S.mode==='inv'?'on':'');
+      if(!S.mode&&S.pick.inv==null) hint('🔎 밤 — 조사할 대상을 고르세요.');
+    }else if(me.role==='doctor'){
+      btn(S.pick.heal!=null?('치료: '+nm(S.pick.heal)):'치료 대상 선택',function(){ S.mode='heal'; hint('치료할 사람을 고르세요. (자신도 가능)'); renderRoster(); renderActions(); },S.mode==='heal'?'on':'');
+      if(!S.mode&&S.pick.heal==null) hint('💉 밤 — 치료할 대상을 고르세요.');
+    }else{
+      hint(ROLES[me.role].e+' '+ROLES[me.role].n+' — 밤에 쓸 능력이 없습니다. 아침을 기다리세요.');
+    }
+  }else if(S.phase==='discuss'){
+    btn(me.claimed===me.role?'공개함':'직업 공개',function(){
+      say(me,'저 '+ROLES[me.role].n+'입니다.','all');
+      addClaim(me.id,me.role);
+      renderRoster(); renderActions();
+    },'',me.claimed===me.role);
+    btn('마피아 지목',function(){ S.mode=(S.mode==='accuse'?null:'accuse'); hint(S.mode?'마피아라고 생각하는 사람을 고르세요.':''); renderRoster(); renderActions(); },S.mode==='accuse'?'on':'');
+    btn('여론조사',function(){ S.mode=(S.mode==='poll'?null:'poll'); hint(S.mode?'여론조사로 지목할 사람을 고르세요. (진행에 영향 없음)':''); renderRoster(); renderActions(); },S.mode==='poll'?'on':'');
+    btn(S.extendUsed?'시간 사용함':'＋15초',function(){
+      S.extendUsed=true; S.tEnd+=15000;
+      sys(me.name+'님이 토론 시간을 15초 연장했습니다.');
+      renderActions();
+    },'',S.extendUsed);
+    btn(S.extendUsed?'―':'－15초',function(){
+      S.extendUsed=true; S.tEnd=Math.max(Date.now()+3000,S.tEnd-15000);
+      sys(me.name+'님이 토론 시간을 15초 단축했습니다.');
+      renderActions();
+    },'',S.extendUsed);
+    if(!S.mode&&!$('#hintBar').innerHTML) hint('💬 토론 — 자유롭게 말하세요. 이름과 직업을 언급하면 AI가 반응합니다.');
+  }else if(S.phase==='vote'){
+    S.mode='vote';
+    hint(S.votes[me.id]!=null?('투표: <b>'+esc(nm(S.votes[me.id]))+'</b> (변경 가능)'):'🗳 명단에서 투표할 사람을 고르세요. 자기 자신도 가능합니다.');
+  }else if(S.phase==='defense'){
+    if(S.accused===me.id) hint('🎤 당신의 최후의 반론입니다. 아래에 입력하세요.');
+    else hint(nm(S.accused)+'님의 최후의 반론을 듣는 중입니다.');
+  }else if(S.phase==='judge'){
+    if(S.accused===me.id){ hint('당신에 대한 찬반 투표 중입니다. 결과를 기다리세요.'); return; }
+    btn('찬성 (처형)',function(){ S.judge[me.id]=true; hint('찬성했습니다.'); renderActions(); },'yes');
+    btn('반대 (생존)',function(){ S.judge[me.id]=false; hint('반대했습니다.'); renderActions(); },'no');
+    if(S.judge[me.id]==null) hint(nm(S.accused)+'님을 처형할까요? 동수면 처형됩니다.');
+  }else{
+    hint('');
+  }
+}
+function renderInput(){
+  var i=$('#chatIn'), me=S.me;
+  i.className='';
+  if(S.over){ i.disabled=true; i.placeholder='게임이 끝났습니다'; return; }
+  if(!me.alive){ i.disabled=false; i.className='dead'; i.placeholder='사망자 채팅 (산 사람은 못 봅니다)'; return; }
+  if(S.phase==='night'){
+    if(me.role==='mafia'){ i.disabled=false; i.className='mafia'; i.placeholder='마피아 비밀 채팅'; }
+    else { i.disabled=true; i.placeholder='밤에는 말할 수 없습니다'; }
+    return;
+  }
+  if(S.phase==='defense'){
+    if(S.accused===me.id){ i.disabled=false; i.placeholder='최후의 반론을 입력하세요'; }
+    else { i.disabled=true; i.placeholder=nm(S.accused)+'님만 말할 수 있습니다'; }
+    return;
+  }
+  if(S.phase==='discuss'||S.phase==='vote'){ i.disabled=false; i.placeholder='메시지 입력'; return; }
+  i.disabled=true; i.placeholder='';
+}
+function renderAll(){ renderActions(); renderRoster(); renderInput(); }
+
+/* ================= 플레이어 발화 파싱 ================= */
+var ROLE_KO={'경찰':'police','의사':'doctor','군인':'soldier','정치인':'politician','영매':'medium','시민':'citizen'};
+function parsePlayerText(raw){
+  var t=raw.replace(/\s+/g,'');
+  var stripped=t;
+  S.ps.forEach(function(p){ stripped=stripped.split(p.name.replace(/\s+/g,'')).join('·'); });
+  // 커밍아웃
+  for(var ko in ROLE_KO){
+    var idx=stripped.indexOf(ko);
+    if(idx<0)continue;
+    var pre=stripped.slice(Math.max(0,idx-4),idx);
+    if(/저|나|제|내|전|본인/.test(pre)){
+      addClaim(S.me.id,ROLE_KO[ko]);
+      break;
+    }
+  }
+  // 지목
+  var mentioned=alive().filter(function(p){
+    return p.id!==S.me.id&&t.indexOf(p.name.replace(/\s+/g,''))>=0;
+  });
+  if(mentioned.length&&/마피아|마피|범인|수상|의심|확정|찍/.test(t)){
+    var strong=/확정|경찰/.test(t)||S.me.claimed==='police';
+    mentioned.slice(0,2).forEach(function(p){ addAccuse(S.me.id,p.id,strong); });
+  }
+  renderRoster();
+}
+function sendMsg(){
+  if(!S)return;
+  var i=$('#chatIn');
+  var v=i.value.trim();
+  if(!v||i.disabled)return;
+  i.value='';
+  var me=S.me;
+  if(!me.alive){ say(me,v,'dead'); return; }
+  if(S.phase==='night'&&me.role==='mafia'){ say(me,v,'mafia'); return; }
+  say(me,v,'all');
+  if(S.phase==='discuss'||S.phase==='vote'||S.phase==='defense') parsePlayerText(v);
+}
+
+/* ================= 규칙 ================= */
+function buildHelp(){
+  var h=$('#helpBody');
+  var html='<p class="lead">8인 클래식전. <b>마피아 2 · 경찰 1 · 의사 1 · 군인 1 · 정치인 1 · 영매 1 · 시민 1</b><br>'+
+    '진행: 밤 → 결과 발표 → 토론 → 투표 → 최후의 반론 → 찬반 투표 → 다시 밤<br>'+
+    '<b>마피아 승리</b>: 마피아 수 ≥ 시민 수 · <b>시민 승리</b>: 마피아 전멸<br>'+
+    '죽은 사람의 직업은 공개되지 않습니다. 싱글에서는 오른쪽 위 ⏭ 로 언제든 건너뛸 수 있습니다.<br>'+
+    '멀티플레이는 4~8인이며 인원에 따라 구성이 달라집니다.</p>';
+  ROLE_ORDER.forEach(function(k){
+    var r=ROLES[k];
+    html+='<div class="roleRow"><div class="e">'+r.e+'</div><div><h4>'+r.n+
+      '<small>'+(r.team==='mafia'?'마피아팀':'시민팀')+'</small></h4><p>'+r.d+'</p></div></div>';
+  });
+  h.innerHTML=html;
+}
+
+/* ================= 시작 ================= */
+function begin(){
+  var nick=$('#nick').value.trim()||'플레이어';
+  newGame(nick);
+  S.pendingReact_id=0;
+  $('#log').innerHTML='';
+  $('#startSheet').classList.remove('show');
+  $('#endSheet').classList.remove('show');
+  document.body.className='night';
+  var r=ROLES[S.me.role];
+  $('#rvE').textContent=r.e;
+  var n=$('#rvN'); n.textContent=r.n; n.className=r.team;
+  var extra='';
+  if(S.me.role==='mafia'){
+    var ms=mates(S.me).map(function(m){return m.av+' '+m.name;}).join(', ');
+    extra='<br><br>동료 마피아: <b>'+esc(ms)+'</b>';
+  }
+  $('#rvD').innerHTML=r.d+extra+'<br><br>당신의 이름은 <b>'+esc(S.me.name)+'</b>입니다.';
+  $('#roleSheet').classList.add('show');
+  renderAll();
+  $('#timer').textContent='--';
+  $('#phaseName').textContent='직업 확인';
+  $('#dayNum').textContent='';
+  if(!ticker) ticker=setInterval(tick,100);
+}
+
+
+/* =========================================================================
+   멀티플레이 (v2) — 방장 브라우저가 심판. 개인 정보는 수신자 공개키로 암호화.
+   싱글플레이 경로는 이 아래 코드를 전혀 거치지 않는다 (네트워크·CDN 미접촉).
+   ========================================================================= */
+var MODE=null;                       // null | 'single' | 'multi'
+var NS='mafia42x';
+var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+var MQTT_CDN=['https://unpkg.com/mqtt@5.14.1/dist/mqtt.min.js','https://cdn.jsdelivr.net/npm/mqtt@5.14.1/dist/mqtt.min.js'];
+var COMP={
+  4:['mafia','police','doctor','citizen'],
+  5:['mafia','police','doctor','soldier','citizen'],
+  6:['mafia','mafia','police','doctor','soldier','citizen'],
+  7:['mafia','mafia','police','doctor','soldier','politician','citizen'],
+  8:['mafia','mafia','police','doctor','soldier','politician','medium','citizen']
+};
+function compText(n){
+  var c={},i; for(i=0;i<COMP[n].length;i++) c[COMP[n][i]]=(c[COMP[n][i]]||0)+1;
+  return ROLE_ORDER.filter(function(k){return c[k];}).map(function(k){return ROLES[k].n+' '+c[k];}).join(' · ');
+}
+function secureOK(){ return !!(window.isSecureContext&&window.crypto&&window.crypto.subtle); }
+function mrid(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s='';for(var i=0;i<n;i++)s+=c[rnd(c.length)];return s;}
+function mclean(s){var t=String(s||'').replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ]/g,'').slice(0,6);return t||'익명';}
+
+/* ---------- 통신 계층 (ox-survival makeMqttNet 준용) ---------- */
+function loadMqtt(){
+  return new Promise(function(res,rej){
+    if(window.mqtt)return res();
+    var i=0;
+    (function next(){
+      if(i>=MQTT_CDN.length)return rej(new Error('mqtt-load'));
+      var s=document.createElement('script');
+      s.src=MQTT_CDN[i++]; s.onload=function(){res();}; s.onerror=next;
+      document.head.appendChild(s);
+    })();
+  });
+}
+function makeMqttNet(){
+  var cl=null,subs={},bi=0;
+  return {
+    connect:function(onState){
+      return loadMqtt().then(function(){
+        return new Promise(function(res,rej){
+          (function tryOne(){
+            if(bi>=BROKERS.length)return rej(new Error('broker'));
+            var url=BROKERS[bi++];
+            var c=window.mqtt.connect(url,{clientId:'mf_'+Math.random().toString(16).slice(2,10),
+              clean:true,reconnectPeriod:2500,connectTimeout:7000,keepalive:30});
+            var done=false;
+            var to=setTimeout(function(){if(!done){done=true;try{c.end(true);}catch(e){} tryOne();}},8000);
+            c.on('connect',function(){ if(done&&cl!==c)return; done=true;clearTimeout(to);cl=c;
+              Object.keys(subs).forEach(function(t){c.subscribe(t,{qos:0});});
+              onState('on'); res(url); });
+            c.on('error',function(){ if(!done){done=true;clearTimeout(to);try{c.end(true);}catch(e){} tryOne();} });
+            c.on('offline',function(){onState('off');});
+            c.on('reconnect',function(){onState('re');});
+            c.on('message',function(t,p){
+              var fn=subs[t]; if(!fn)return;
+              var s=p.toString();
+              try{ fn(s?JSON.parse(s):null); }catch(e){}
+            });
+          })();
+        });
+      });
+    },
+    sub:function(t,fn){subs[t]=fn;if(cl)cl.subscribe(t,{qos:0});},
+    unsub:function(t){delete subs[t];if(cl)cl.unsubscribe(t);},
+    pub:function(t,obj,retain){
+      if(!cl)return;
+      /* 연결이 끊긴 동안의 retained state는 버린다 — 1.2초 뒤 어차피 다시 올라간다.
+         (닫히는 소켓에 쓰면 브라우저가 콘솔 오류를 남긴다) */
+      if(retain&&cl.connected===false)return;
+      try{ cl.publish(t,obj===null?'':JSON.stringify(obj),{qos:0,retain:!!retain}); }catch(e){}
+    },
+    end:function(){try{cl&&cl.end(true);}catch(e){}}
+  };
+}
+var NET=null;
+
+/* ---------- 암호화 (WebCrypto · RSA-OAEP 2048 + AES-GCM 하이브리드) ---------- */
+var RSA_ALG={name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'};
+var RSA_MAX=190;   // RSA-OAEP(2048,SHA-256) 직접 암호화 상한 = 190바이트
+function b64(buf){var b=new Uint8Array(buf),s='',i;for(i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s);}
+function ub64(s){var bin=atob(s),b=new Uint8Array(bin.length),i;for(i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return b.buffer;}
+function genKeys(){return crypto.subtle.generateKey(RSA_ALG,true,['encrypt','decrypt']);}
+function expPub(k){return crypto.subtle.exportKey('jwk',k);}
+function impPub(jwk){return crypto.subtle.importKey('jwk',jwk,{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);}
+function seal(pub,obj){
+  var raw=new TextEncoder().encode(JSON.stringify(obj));
+  if(raw.byteLength<=RSA_MAX){
+    return crypto.subtle.encrypt({name:'RSA-OAEP'},pub,raw).then(function(ct){return {m:'r',c:b64(ct)};});
+  }
+  var iv=crypto.getRandomValues(new Uint8Array(12)),aes=null;
+  return crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt'])
+    .then(function(k){aes=k;return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,raw);})
+    .then(function(ct){
+      return crypto.subtle.exportKey('raw',aes).then(function(rk){
+        return crypto.subtle.encrypt({name:'RSA-OAEP'},pub,rk).then(function(ek){
+          return {m:'h',k:b64(ek),i:b64(iv),c:b64(ct)};
+        });
+      });
+    });
+}
+function unseal(priv,env){
+  if(!env||!env.m)return Promise.reject(new Error('bad-envelope'));
+  if(env.m==='r'){
+    return crypto.subtle.decrypt({name:'RSA-OAEP'},priv,ub64(env.c))
+      .then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});
+  }
+  return crypto.subtle.decrypt({name:'RSA-OAEP'},priv,ub64(env.k))
+    .then(function(rk){return crypto.subtle.importKey('raw',rk,{name:'AES-GCM'},false,['decrypt']);})
+    .then(function(aes){return crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(ub64(env.i))},aes,ub64(env.c));})
+    .then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});
+}
+/* crypto.subtle이 전부 async라 완료 순서가 발행 순서와 달라질 수 있다.
+   밤 능력·투표는 순서가 결과를 바꾸므로 발행/수신 각각 Promise 체인으로 직렬화한다. */
+var sendQ=Promise.resolve(), recvQ=Promise.resolve();
+function qSend(fn){ sendQ=sendQ.then(fn)['catch'](function(e){console.error('[mp/send]',e);}); return sendQ; }
+function qRecv(fn){ recvQ=recvQ.then(fn)['catch'](function(e){console.error('[mp/recv]',e);}); return recvQ; }
+
+/* ---------- 시계 ----------
+   백그라운드 탭에서 setInterval은 1초까지 늘어나거나 멈춘다. 방장이 심판이라
+   방장 탭이 뒤로 가면 전원의 게임이 멈춘다. 워커 타이머는 클램프를 받지 않으므로
+   진행·하트비트를 워커 시계로 돌리고, 워커를 못 만들면 setInterval로 되돌아간다. */
+function makeClock(fn,ms){
+  try{
+    var src='var t=setInterval(function(){postMessage(0)},'+ms+');';
+    var w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+    w.onmessage=fn;
+    return function(){ try{w.terminate();}catch(e){} };
+  }catch(e){
+    var id=setInterval(fn,ms);
+    return function(){ clearInterval(id); };
+  }
+}
+
+/* ---------- 세션 상태 ---------- */
+var MS=null, MV=null, G=null, mpClockStop=null, lastHb=0;
+function newSession(){
+  return {code:'',pid:mrid(8),name:'',av:'🐱',isHost:false,
+    hostKeyJwk:null,
+    role:null,mates:[],alive:true,playing:false,claimed:null,
+    offset:0,lastState:0,net:'idle',mode:null,target:null,pick:{},
+    msgs:[],pmap:{},seenMsg:{},revealShown:false,endShown:false,lastPh:'',lastDay:-1};
+}
+function inviteLink(){return location.origin+location.pathname+'#'+MS.code;}
+
+/* =========================================================================
+   LINK — 통신 어댑터 (게임 로직과 전송 계층의 유일한 경계)
+   -------------------------------------------------------------------------
+   이 객체 바깥의 게임 로직은 mqtt·토픽 이름·암호화 함수를 직접 부르지 않는다.
+   나중에 서버(예: Cloudflare Workers + Durable Objects)로 옮길 때
+   여기 있는 메서드 본문만 갈아끼우면 된다.
+
+     ready()                  키 생성 + 연결
+     publicKey()              내 공개키(JWK)
+     openHost(code,h)         권위자로 방 열기   h={onAction(pid,action)}
+     openGuest(code,h)        참가자로 방 붙기   h={onState,onPublic,onPrivate}
+     setPeerKey(pid,jwk)      권위자가 참가자 공개키 등록 (Promise)
+     setAuthorityKey(jwk)     참가자가 권위자 공개키 등록 (Promise)
+     join(name)/heartbeat(name)/leave()   평문 접속 이벤트
+     send(action)             참가자 → 권위자 (암호화)
+     pushState(v)             권위자 → 전원 (공개 상태)
+     pushPublic(m)            권위자 → 전원 (공개 로그·채팅)
+     pushPrivate(pid,o,ret)   권위자 → 개인 (수신자 공개키로 암호화)
+     clearPrivate(pid)        개인 보관 메시지 비우기
+     closeRoom(text)          권위자: 방 닫힘 공지 + 보관 상태 정리
+     close()                  구독 해제
+   ========================================================================= */
+var LINK=(function(){
+  var code='', me='', priv=null, pubJwk=null, authKey=null, peer={}, H={};
+  function T(){return NS+'/'+code;}
+  function tState(){return T()+'/state';}
+  function tEv(){return T()+'/ev';}
+  function tPub(){return T()+'/pub';}
+  function tP(pid){return T()+'/p/'+pid;}
+  function tR(pid){return T()+'/r/'+pid;}
+  function onSealed(m){
+    if(!m||!m.d||!H.onPrivate)return;
+    qRecv(function(){ return unseal(priv,m.d).then(H.onPrivate); });
+  }
+  function onRaw(m){
+    if(!m||!m.pid||!H.onAction)return;
+    if(m.t==='sec'){
+      if(!m.d)return;
+      qRecv(function(){ return unseal(priv,m.d).then(function(o){ H.onAction(m.pid,o); }); });
+      return;
+    }
+    H.onAction(m.pid,m);
+  }
+  return {
+    ready:function(pid,onNet){
+      me=pid;
+      if(!NET) NET=makeMqttNet();
+      var step=priv?Promise.resolve():genKeys().then(function(kp){
+        priv=kp.privateKey; return expPub(kp.publicKey).then(function(j){ pubJwk=j; });
+      });
+      return step.then(function(){ return NET.connect(onNet); });
+    },
+    setId:function(pid){ me=pid; },
+    publicKey:function(){ return pubJwk; },
+    openHost:function(c,h){ code=c; H=h||{}; peer={}; authKey=null; NET.sub(tEv(),onRaw); },
+    openGuest:function(c,h){
+      code=c; H=h||{}; peer={}; authKey=null;
+      NET.sub(tState(),function(v){ H.onState&&H.onState(v); });
+      NET.sub(tPub(),function(m){ H.onPublic&&H.onPublic(m); });
+      NET.sub(tP(me),onSealed);
+      NET.sub(tR(me),onSealed);
+    },
+    setPeerKey:function(pid,jwk){ return impPub(jwk).then(function(k){ peer[pid]=k; }); },
+    setAuthorityKey:function(jwk){ return impPub(jwk).then(function(k){ authKey=k; }); },
+    hasAuthorityKey:function(){ return !!authKey; },
+    join:function(name){ NET.pub(tEv(),{t:'join',pid:me,name:name,jwk:pubJwk}); },
+    heartbeat:function(name){ NET.pub(tEv(),{t:'hb',pid:me,name:name,jwk:pubJwk}); },
+    leave:function(){ if(code) NET.pub(tEv(),{t:'leave',pid:me}); },
+    send:function(action){
+      if(!authKey)return;
+      qSend(function(){
+        return seal(authKey,action).then(function(env){ NET.pub(tEv(),{t:'sec',pid:me,d:env}); });
+      });
+    },
+    pushState:function(v){ NET.pub(tState(),v,true); },
+    pushPublic:function(m){ NET.pub(tPub(),m); },
+    pushPrivate:function(pid,o,retained){
+      var k=peer[pid];
+      if(!k)return;
+      qSend(function(){
+        return seal(k,o).then(function(env){ NET.pub(retained?tR(pid):tP(pid),{d:env},!!retained); });
+      });
+    },
+    clearPrivate:function(pid){ NET.pub(tR(pid),null,true); },
+    closeRoom:function(text){
+      if(!code)return;
+      NET.pub(tPub(),{k:'close',id:me+'_x',t:text});
+      NET.pub(tState(),null,true);
+    },
+    close:function(){
+      if(!code)return;
+      NET.unsub(tState()); NET.unsub(tEv()); NET.unsub(tPub());
+      NET.unsub(tP(me)); NET.unsub(tR(me));
+      code=''; H={}; peer={}; authKey=null;
+    }
+  };
+})();
+
+/* ---------- 멀티 로그 ---------- */
+function mpVisible(m){
+  if(MV&&MV.ph==='end')return true;
+  if(m.ch==='mafia')return MS.role==='mafia';
+  if(m.ch==='dead')return (!MS.alive&&MS.playing)||(MS.role==='medium'&&MS.alive);
+  return true;
+}
+function mpRender1(m){
+  var d=document.createElement('div');
+  if(m.k==='sys'){ d.className='sys'+(m.cls?' '+m.cls:''); d.innerHTML=esc(m.t); return d; }
+  var p=MS.pmap[m.pid]||{name:'?',av:'❔'};
+  d.className='msg'+(m.ch==='mafia'?' mafiaCh':'')+(m.ch==='dead'?' deadCh':'')+(m.pid===MS.pid?' me':'');
+  var tag=m.ch==='mafia'?' <span style="color:#ff4d6d">🔪비밀</span>':(m.ch==='dead'?' <span style="color:#7b849c">💀</span>':'');
+  d.innerHTML='<div class="mav">'+esc(p.av)+'</div><div class="bd"><div class="who">'+
+    esc(p.name)+tag+'</div><div class="tx">'+esc(m.t)+'</div></div>';
+  return d;
+}
+function mpPush(m){
+  MS.msgs.push(m);
+  if(MS.msgs.length>200)MS.msgs.shift();
+  if(!mpVisible(m))return;
+  var log=$('#log');
+  log.appendChild(mpRender1(m));
+  while(log.children.length>160)log.removeChild(log.firstChild);
+  log.scrollTop=log.scrollHeight;
+}
+function mpSys(t,cls){mpPush({k:'sys',t:t,cls:cls||''});}
+function mpRedraw(){
+  var log=$('#log'); log.innerHTML='';
+  MS.msgs.forEach(function(m){ if(mpVisible(m)) log.appendChild(mpRender1(m)); });
+  log.scrollTop=log.scrollHeight;
+}
+
+/* ---------- 공개 브로드캐스트 수신 ---------- */
+function mpOnPub(m){
+  if(!m||!m.id)return;
+  if(MS.seenMsg[m.id])return;
+  MS.seenMsg[m.id]=1;
+  if(m.k==='close'){ mpLeave(m.t||'방장이 나가 게임이 종료되었습니다.'); return; }
+  mpPush(m);
+}
+/* ---------- 개인(암호화) 수신 ---------- */
+function mpOnPriv(o){
+  if(!o)return;
+  if(o.t==='role'){ MS.pendRole=o; mpApplyRole(); return; }
+  if(o.t==='priv'){ mpPush({k:'sys',t:o.x,cls:'priv'}); return; }
+  if(o.t==='chat'){ mpPush({k:'msg',pid:o.pid,t:o.x,ch:o.ch}); return; }
+  if(o.t==='dead'){ MS.alive=false; mpRenderAll(); return; }
+}
+
+/* 역할 카드는 state(판 토큰)와 도착 순서가 뒤바뀔 수 있다.
+   토큰이 맞을 때만 적용하고, 지난 판의 retained 카드는 무시한다. */
+function mpApplyRole(){
+  var o=MS.pendRole;
+  if(!o||!MV||o.g!==MV.g)return;
+  if(MS.roleG===o.g)return;
+  MS.roleG=o.g; MS.role=o.role; MS.mates=o.mates||[]; MS.alive=true; MS.playing=true;
+  mpShowRole(); mpRenderAll();
+}
+
+/* ---------- 클라이언트 → 방장 이벤트 ---------- */
+function mpSendEv(o){
+  if(MS.isHost){ hostEv(MS.pid,o); return; }   // 방장은 자기 행동을 바로 처리한다
+  LINK.send(o);
+}
+/* ---------- 방장 → 개인 전송 ---------- */
+function deliver(pid,o,retained){
+  if(pid===MS.pid){ mpOnPriv(o); return; }
+  LINK.pushPrivate(pid,o,retained);
+}
+function pubMsg(m){ m.id=MS.pid+'_'+(++G.seq); LINK.pushPublic(m); mpOnPub(m); }
+function announce(t,cls){ pubMsg({k:'sys',t:t,cls:cls||''}); }
+
+/* =========================================================================
+   방장 로직
+   ========================================================================= */
+function hostAlive(){var a=[],pid;for(pid in G.players){var p=G.players[pid];if(p.playing&&p.alive)a.push(p);}return a;}
+function hostPlaying(){var a=[],pid;for(pid in G.players){var p=G.players[pid];if(p.playing)a.push(p);}return a;}
+function hAlive(pid){var p=G.players[pid];return !!(p&&p.playing&&p.alive);}
+function hName(pid){var p=G.players[pid];return p?p.name:'?';}
+
+function hostAddPlayer(pid,name,av,jwk){
+  var p=G.players[pid];
+  if(!p){
+    p=G.players[pid]={pid:pid,name:mclean(name),av:av||pick(AVS),seen:Date.now(),
+      playing:false,alive:false,role:null,shield:false,claimed:null,revealed:null,key:null};
+    G.order.push(pid);
+    G.dirty=true;
+    if(G.phase==='lobby') announce(p.name+'님이 들어왔습니다.');
+  }
+  p.seen=Date.now();
+  if(name&&p.name!==mclean(name)){p.name=mclean(name);G.dirty=true;}
+  if(jwk&&!p.key){
+    var j=JSON.stringify(jwk);
+    if(p.jwkStr!==j){
+      p.jwkStr=j;
+      qRecv(function(){ return LINK.setPeerKey(pid,jwk).then(function(){ p.key=1; G.dirty=true; }); });
+    }
+  }
+}
+function hostAvatar(){
+  var used={},pid;
+  for(pid in G.players)used[G.players[pid].av]=1;
+  for(var i=0;i<AVS.length;i++) if(!used[AVS[i]]) return AVS[i];
+  return pick(AVS);
+}
+function hostEv(pid,m){
+  if(!G||!m)return;
+  var p=G.players[pid];
+  if(m.t==='join'){
+    if(!p&&G.phase!=='lobby'){ /* 게임 중 입장 = 관전자 */ }
+    hostAddPlayer(pid,m.name,m.av||hostAvatar(),m.jwk);
+    G.dirty=true; hostPublish(); return;
+  }
+  if(m.t==='hb'){ if(p){p.seen=Date.now();} else hostAddPlayer(pid,m.name,m.av||hostAvatar(),m.jwk); return; }
+  if(m.t==='leave'){
+    if(!p)return;
+    if(G.phase==='lobby'||!p.playing){ delete G.players[pid]; G.order=G.order.filter(function(x){return x!==pid;}); }
+    else if(p.alive){ p.alive=false; announce(p.name+'님이 나가 사망 처리되었습니다.','bad'); if(hostCheckWin())return; }
+    G.dirty=true; return;
+  }
+  if(!p)return;
+  p.seen=Date.now();
+  if(m.t==='start'){ if(pid===G.host&&G.phase==='lobby') hostStartGame(); return; }
+  if(m.t==='again'){ if(pid===G.host&&G.phase==='end') hostToLobby(); return; }
+  if(!p.playing)return;
+  if(m.t==='chat'){ hostChat(p,String(m.x||'').slice(0,60).trim()); return; }
+  if(!p.alive)return;
+  if(m.t==='pick'){
+    if(G.phase!=='night')return;
+    if(!hAlive(m.target))return;
+    if(m.k==='kill'){
+      if(p.role!=='mafia')return;
+      if(G.players[m.target].role==='mafia')return;
+      G.picks.kill=m.target;
+      hostAlive().forEach(function(q){
+        if(q.role!=='mafia')return;
+        deliver(q.pid,{t:'chat',ch:'mafia',pid:p.pid,x:'▶ '+eul(hName(m.target))+' 지목했습니다.'});
+      });
+    }else if(m.k==='inv'){ if(p.role!=='police'||m.target===pid)return; G.picks['inv'+pid]=m.target; }
+    else if(m.k==='heal'){ if(p.role!=='doctor')return; G.picks['heal'+pid]=m.target; }
+    return;
+  }
+  if(m.t==='vote'){ if(G.phase!=='vote'||!hAlive(m.target))return; G.votes[pid]=m.target; G.dirty=true; return; }
+  if(m.t==='judge'){ if(G.phase!=='judge'||pid===G.accused)return; G.judge[pid]=!!m.v; return; }
+  if(m.t==='poll'){ if(G.phase!=='discuss'||!hAlive(m.target)||m.target===pid)return; G.poll[pid]=m.target; G.dirty=true; return; }
+  if(m.t==='claim'){
+    if(G.phase!=='discuss'||!p.role)return;
+    if(p.claimed===p.role)return;
+    p.claimed=p.role; G.dirty=true;
+    pubMsg({k:'msg',pid:pid,t:'저 '+ROLES[p.role].n+'입니다.',ch:'all'});
+    return;
+  }
+  if(m.t==='accuse'){
+    if(G.phase!=='discuss'||!hAlive(m.target)||m.target===pid)return;
+    pubMsg({k:'msg',pid:pid,t:eun(hName(m.target))+' 마피아 같습니다.',ch:'all'});
+    return;
+  }
+  if(m.t==='ext'){
+    if(G.phase!=='discuss'||G.ext[pid])return;
+    G.ext[pid]=1;
+    if(m.d>0){ G.endsAt+=15000; announce(p.name+'님이 토론 시간을 15초 연장했습니다.'); }
+    else { G.endsAt=Math.max(Date.now()+3000,G.endsAt-15000); announce(p.name+'님이 토론 시간을 15초 단축했습니다.'); }
+    G.dirty=true; return;
+  }
+}
+function hostChat(p,x){
+  if(!x)return;
+  if(!p.alive){                                   // 사망자 채팅 → 사망자 + 영매
+    hostPlaying().forEach(function(q){
+      if(!q.alive||(q.alive&&q.role==='medium'))
+        deliver(q.pid,{t:'chat',ch:'dead',pid:p.pid,x:x});
+    });
+    return;
+  }
+  if(G.phase==='night'){                          // 마피아 비밀 채팅 → 살아있는 마피아만
+    if(p.role!=='mafia')return;
+    hostAlive().forEach(function(q){
+      if(q.role==='mafia') deliver(q.pid,{t:'chat',ch:'mafia',pid:p.pid,x:x});
+    });
+    return;
+  }
+  if(G.phase==='defense'&&G.accused!==p.pid)return;
+  if(G.phase!=='discuss'&&G.phase!=='vote'&&G.phase!=='defense')return;
+  pubMsg({k:'msg',pid:p.pid,t:x,ch:'all'});
+}
+
+function hostTally(weighted){
+  var t={},v;
+  for(v in G.votes){
+    var tg=G.votes[v];
+    if(!hAlive(tg)||!hAlive(v))continue;
+    var w=1;
+    if(weighted&&G.players[v].role==='politician')w=2;
+    t[tg]=(t[tg]||0)+w;
+  }
+  return t;
+}
+function hostPollCount(){
+  var t={},v;
+  for(v in G.poll){ var tg=G.poll[v]; if(hAlive(tg)&&hAlive(v)) t[tg]=(t[tg]||0)+1; }
+  return t;
+}
+function hostPublish(){
+  if(!G)return;
+  G.dirty=false; G.lastPub=Date.now();
+  var players=[],lobby=[],i;
+  for(i=0;i<G.order.length;i++){
+    var p=G.players[G.order[i]];
+    if(!p)continue;
+    lobby.push({pid:p.pid,name:p.name,av:p.av,host:p.pid===G.host,ready:!!p.key});
+    if(p.playing) players.push({pid:p.pid,name:p.name,av:p.av,alive:p.alive,claimed:p.claimed,revealed:p.revealed});
+  }
+  var hide=(G.phase==='vote'&&(G.endsAt-Date.now())<=5000);
+  var v={ph:G.phase,day:G.day,g:G.gameNo,endsAt:G.endsAt,pub:Date.now(),host:G.host,
+    hostPub:LINK.publicKey(),players:players,lobby:lobby,accused:G.accused,
+    tally:G.phase==='vote'?hostTally(false):null,hideTally:hide,
+    poll:G.phase==='discuss'?hostPollCount():null,over:G.over};
+  LINK.pushState(v);
+  applyState(v);
+}
+function hostStartGame(){
+  var ids=G.order.filter(function(pid){return G.players[pid]&&(pid===G.host||G.players[pid].key);});
+  if(ids.length<4){ announce('4명 이상이어야 시작할 수 있습니다. (현재 '+ids.length+'명)'); return; }
+  if(ids.length>8) ids=ids.slice(0,8);
+  var roles=shuffle(COMP[ids.length]);
+  var sids=shuffle(ids);
+  var pid;
+  for(pid in G.players){var q=G.players[pid];q.playing=false;q.alive=false;q.role=null;q.shield=false;q.claimed=null;q.revealed=null;}
+  sids.forEach(function(id,i){
+    var p=G.players[id];
+    p.playing=true; p.alive=true; p.role=roles[i]; p.shield=(roles[i]==='soldier');
+  });
+  G.gameNo++;
+  G.day=0; G.over=null; G.accused=null; G.votes={}; G.judge={}; G.poll={}; G.picks={}; G.ext={};
+  G.phase='reveal'; G.endsAt=Date.now()+10000; G.dirty=true;
+  announce('― 게임 시작 ―','hr');
+  announce(sids.length+'인전 — '+compText(sids.length));
+  hostPublish();                       // 판 토큰(g)을 먼저 올린 뒤 역할 카드를 보낸다
+  sids.forEach(function(id){
+    var p=G.players[id];
+    var mates=(p.role==='mafia')?sids.filter(function(x){return x!==id&&G.players[x].role==='mafia';})
+      .map(function(x){return {pid:x,name:G.players[x].name,av:G.players[x].av};}):[];
+    deliver(id,{t:'role',g:G.gameNo,role:p.role,mates:mates},true);
+  });
+}
+function hostToLobby(){
+  var pid;
+  for(pid in G.players){var p=G.players[pid];p.playing=false;p.alive=false;p.role=null;p.claimed=null;p.revealed=null;p.shield=false;}
+  G.order.forEach(function(pid){ LINK.clearPrivate(pid); });   // 지난 판 역할 카드 보관분 제거
+  G.phase='lobby'; G.day=0; G.over=null; G.accused=null; G.endsAt=0;
+  G.votes={};G.judge={};G.poll={};G.picks={};G.ext={};
+  G.dirty=true; hostPublish();
+}
+function hostStartNight(){
+  G.day++;
+  G.votes={};G.judge={};G.poll={};G.picks={};G.ext={};G.accused=null;
+  G.phase='night'; G.endsAt=Date.now()+25000; G.dirty=true;
+  announce('― '+G.day+'일차 밤 ―','hr');
+  announce('밤이 되었습니다. 모두 눈을 감아 주세요.');
+  hostPublish();
+}
+function hostEndNight(){
+  var killT=(G.picks.kill&&hAlive(G.picks.kill))?G.picks.kill:null;
+  var heals={};
+  hostAlive().forEach(function(p){
+    if(p.role!=='doctor')return;
+    var h=G.picks['heal'+p.pid];
+    if(h&&hAlive(h)) heals[h]=p.pid;
+  });
+  hostAlive().forEach(function(p){
+    if(p.role!=='police')return;
+    var t=G.picks['inv'+p.pid];
+    if(!t||!hAlive(t))return;
+    var isM=(G.players[t].role==='mafia');
+    deliver(p.pid,{t:'priv',x:'조사 결과 — '+eun(hName(t))+(isM?' 마피아입니다. 🔪':' 마피아가 아닙니다.')});
+  });
+  var killed=null,blocked=false,shieldUsed=false,savedBy=null;
+  if(killT){
+    var tp=G.players[killT];
+    if(heals[killT]){ blocked=true; savedBy=heals[killT]; }
+    else if(tp.role==='soldier'&&tp.shield){ tp.shield=false; blocked=true; shieldUsed=true; }
+    else { tp.alive=false; killed=killT; }
+  }
+  if(blocked&&savedBy) deliver(savedBy,{t:'priv',x:'당신의 치료로 '+ie(hName(killT))+' 살았습니다.'});
+  if(shieldUsed) deliver(killT,{t:'priv',x:'방탄이 발동했습니다. 다음 공격은 막지 못합니다.'});
+  if(killed){
+    deliver(killed,{t:'dead'});
+    deliver(killed,{t:'priv',x:'당신은 사망했습니다. 이제 사망자 채팅만 가능합니다.'});
+  }
+  G.lastKill=killed;
+  hostStartResult();
+}
+function hostStartResult(){
+  G.phase='result'; G.endsAt=Date.now()+4000; G.dirty=true;
+  announce('― '+G.day+'일차 아침 ―','hr');
+  if(G.lastKill) announce(hName(G.lastKill)+'님이 사망했습니다.','bad');
+  else announce('조용하게 밤이 지나갔습니다.','big');
+  hostPublish();
+}
+function hostStartDiscuss(){
+  var n=hostAlive().length, dur=n*15;
+  G.phase='discuss'; G.endsAt=Date.now()+dur*1000; G.ext={}; G.poll={}; G.dirty=true;
+  announce('토론 시간입니다. ('+dur+'초) 자유롭게 대화하세요.');
+  hostPublish();
+}
+function hostStartVote(){
+  G.votes={};
+  G.phase='vote'; G.endsAt=Date.now()+15000; G.dirty=true;
+  announce('투표 시간입니다. (15초) 종료 5초 전부터 득표가 비공개됩니다.');
+  hostPublish();
+}
+function hostEndVote(){
+  var shown=hostTally(false), weighted=hostTally(true);
+  var lines=Object.keys(shown).sort(function(a,b){return shown[b]-shown[a];})
+    .map(function(id){return hName(id)+' '+shown[id]+'표';});
+  announce(lines.length?('투표 결과 — '+lines.join(' / ')):'아무도 투표하지 않았습니다.');
+  var max=-1,tops=[],id;
+  for(id in weighted){
+    if(weighted[id]>max){max=weighted[id];tops=[id];}
+    else if(weighted[id]===max)tops.push(id);
+  }
+  if(max<=0||tops.length!==1){
+    announce(tops.length>1?'동률입니다. 오늘은 처형 없이 넘어갑니다.':'처형 없이 밤으로 넘어갑니다.');
+    hostGap(); return;
+  }
+  G.accused=tops[0];
+  hostStartDefense();
+}
+function hostStartDefense(){
+  G.phase='defense'; G.endsAt=Date.now()+15000; G.dirty=true;
+  announce(hName(G.accused)+'님이 최다 득표로 지목되었습니다. 최후의 반론 (15초)','big');
+  hostPublish();
+}
+function hostStartJudge(){
+  G.judge={};
+  G.phase='judge'; G.endsAt=Date.now()+5000; G.dirty=true;
+  announce(hName(G.accused)+'님을 처형할까요? (5초) 찬성/반대는 비공개입니다.');
+  hostPublish();
+}
+function hostEndJudge(){
+  var yes=0,no=0;
+  hostAlive().forEach(function(p){
+    if(p.pid===G.accused)return;
+    var v=G.judge[p.pid];
+    if(v==null)return;
+    var w=(p.role==='politician')?2:1;
+    if(v)yes+=w;else no+=w;
+  });
+  announce('찬성 '+yes+'표 / 반대 '+no+'표');
+  var ap=G.players[G.accused];
+  var exec=ap&&(yes>0||no>0)&&(yes>=no);
+  if(exec&&ap.role==='politician'){
+    ap.revealed='politician';
+    announce(eun(ap.name)+' 정치인입니다. 투표로는 처형되지 않습니다.','big');
+    exec=false;
+  }
+  if(exec){
+    ap.alive=false;
+    announce(ap.name+'님이 처형되었습니다.','bad');
+    deliver(ap.pid,{t:'dead'});
+    deliver(ap.pid,{t:'priv',x:'당신은 처형되었습니다. 이제 사망자 채팅만 가능합니다.'});
+  }else if(ap){
+    announce(eun(ap.name)+' 생존했습니다.');
+  }
+  G.dirty=true;
+  hostGap();
+}
+function hostGap(){
+  G.phase='gap'; G.endsAt=Date.now()+2500; G.dirty=true; hostPublish();
+}
+function hostCheckWin(){
+  var mf=0,ct=0;
+  hostAlive().forEach(function(p){
+    if(p.role==='mafia')mf++;
+    else ct+=(p.role==='politician'?2:1);
+  });
+  if(mf>=ct){ hostGameOver('mafia'); return true; }
+  if(mf===0){ hostGameOver('citizen'); return true; }
+  return false;
+}
+function hostGameOver(team){
+  G.over={team:team,roles:hostPlaying().map(function(p){return {pid:p.pid,role:p.role,alive:p.alive};})};
+  G.phase='end'; G.endsAt=0; G.dirty=true;
+  announce('― 게임 종료 ―','hr');
+  announce(team==='mafia'?'마피아팀 승리':'시민팀 승리','big');
+  hostPublish();
+}
+function hostPhaseEnd(){
+  if(G.phase==='reveal'){ hostStartNight(); }
+  else if(G.phase==='night'){ hostEndNight(); }
+  else if(G.phase==='result'){ if(!hostCheckWin()) hostStartDiscuss(); }
+  else if(G.phase==='discuss'){ hostStartVote(); }
+  else if(G.phase==='vote'){ hostEndVote(); }
+  else if(G.phase==='defense'){ hostStartJudge(); }
+  else if(G.phase==='judge'){ hostEndJudge(); }
+  else if(G.phase==='gap'){ if(!hostCheckWin()) hostStartNight(); }
+}
+function hostTick(){
+  if(!G)return;
+  var t=Date.now(),pid;
+  if(G.lastTick){
+    var gap=t-G.lastTick;
+    if(gap>3000){                       // 방장 탭이 멈춰 있었다 → 그 시간만큼 판을 미룬다
+      if(G.endsAt) G.endsAt+=gap;
+      for(pid in G.players) G.players[pid].seen+=gap;
+      G.dirty=true;
+    }
+  }
+  G.lastTick=t;
+  for(pid in G.players){
+    if(pid===G.host)continue;
+    var p=G.players[pid];
+    if(t-p.seen<=11000)continue;
+    if(!p.playing||G.phase==='lobby'){
+      delete G.players[pid];
+      G.order=G.order.filter(function(x){return x!==pid;});
+      G.dirty=true;
+      if(G.phase==='lobby') announce(p.name+'님이 나갔습니다.');
+    }else if(p.alive){
+      p.alive=false; G.dirty=true;
+      announce(p.name+'님의 접속이 끊겨 사망 처리되었습니다.','bad');
+      if(hostCheckWin())return;
+    }
+  }
+  if(G.phase!=='lobby'&&G.phase!=='end'&&G.endsAt&&t>=G.endsAt) hostPhaseEnd();
+  if(G.dirty||t-G.lastPub>1200) hostPublish();
+}
+
+/* =========================================================================
+   클라이언트 (방장 포함) 화면
+   ========================================================================= */
+function applyState(v){
+  if(!v){ mpLeave('방장이 방을 닫았습니다.'); return; }
+  MV=v; MS.lastState=Date.now(); MS.offset=v.pub-Date.now();
+  (v.lobby||[]).forEach(function(p){MS.pmap[p.pid]={name:p.name,av:p.av};});
+  (v.players||[]).forEach(function(p){MS.pmap[p.pid]={name:p.name,av:p.av};});
+  if(!MS.isHost&&v.hostPub&&JSON.stringify(v.hostPub)!==MS.hostKeyJwk){
+    MS.hostKeyJwk=JSON.stringify(v.hostPub);
+    qRecv(function(){ return LINK.setAuthorityKey(v.hostPub); });
+  }
+  var me=null;
+  (v.players||[]).forEach(function(p){ if(p.pid===MS.pid) me=p; });
+  MS.playing=!!me; MS.alive=me?me.alive:false;
+  if(me) MS.claimed=me.claimed;
+  if(MS.roleG!=null&&MS.roleG!==v.g){ MS.role=null; MS.mates=[]; MS.roleG=null; }
+  if(v.ph!==MS.lastPh){
+    MS.lastPh=v.ph; MS.mode=null; MS.target=null; MS.pick={}; MS.judged=false;
+    $('#hintBar').innerHTML='';
+    if(v.ph==='lobby'){ MS.role=null; MS.mates=[]; MS.roleG=null; MS.pendRole=null; MS.playing=false; MS.alive=true; MS.endShown=false; }
+    mpRedraw();
+  }
+  mpApplyRole();
+  mpSheets();
+  mpRenderAll();
+}
+function mpSheets(){
+  var lobby=$('#lobbySheet');
+  if(MV.ph==='lobby'){
+    $('#mpSheet').classList.remove('show');
+    $('#endSheet').classList.remove('show');
+    $('#roleSheet').classList.remove('show');
+    lobby.classList.add('show');
+    mpRenderLobby();
+  }else{
+    lobby.classList.remove('show');
+  }
+  if(MV.ph!=='reveal') $('#roleSheet').classList.remove('show');
+  if(MV.ph==='end'&&MV.over&&!MS.endShown){ MS.endShown=true; mpShowEnd(); }
+}
+function mpRenderLobby(){
+  $('#lobbyCode').textContent=MS.code;
+  var ul=$('#lobbyList'); ul.innerHTML='';
+  var list=MV.lobby||[];
+  list.forEach(function(p){
+    var li=document.createElement('li');
+    li.className=(p.pid===MS.pid?'mine':'');
+    var tags=[]; if(p.host)tags.push('👑 방장');
+    if(p.pid===MS.pid)tags.push('나');
+    li.innerHTML='<span class="e">'+esc(p.av)+'</span><span class="n">'+esc(p.name)+'</span>'+
+      '<span class="r" style="color:var(--muted);font-size:10.5px">'+esc(tags.join(' · '))+'</span>';
+    ul.appendChild(li);
+  });
+  var playable=list.length;
+  $('#lobbyWarn').innerHTML='방장의 권한은 <b>게임 시작</b>과 <b>한 판 더</b> 뿐이고, 게임에는 다른 참가자와 똑같이 참여합니다.';
+  var note=$('#lobbyNote');
+  var b=$('#lobbyStart');
+  if(MS.isHost){
+    b.style.display='';
+    b.disabled=(playable<4||playable>8);
+    b.textContent=playable<4?('게임 시작 ('+playable+'/4명)'):(playable>8?'8명까지만 가능합니다':('게임 시작 ('+playable+'인전)'));
+    note.innerHTML='초대 링크를 복사해 친구에게 보내세요. <b>4~8인</b>이면 시작할 수 있습니다.'+
+      (playable>=4?('<br>구성: <b>'+esc(compText(Math.min(playable,8)))+'</b>'):'');
+  }else{
+    b.style.display='none';
+    note.innerHTML='방장이 시작하기를 기다리는 중… ('+playable+'명)';
+  }
+}
+function mpShowRole(){
+  var r=ROLES[MS.role]; if(!r)return;
+  $('#rvE').textContent=r.e;
+  var n=$('#rvN'); n.textContent=r.n; n.className=r.team;
+  var extra='';
+  if(MS.role==='mafia'&&MS.mates.length)
+    extra='<br><br>동료 마피아: <b>'+esc(MS.mates.map(function(m){return m.av+' '+m.name;}).join(', '))+'</b>';
+  $('#rvD').innerHTML=r.d+extra+'<br><br>당신의 이름은 <b>'+esc(MS.name)+'</b>입니다.';
+  $('#roleOk').textContent='확인';
+  $('#lobbySheet').classList.remove('show');
+  $('#roleSheet').classList.add('show');
+}
+function mpShowEnd(){
+  var o=MV.over;
+  var myRole=null;
+  o.roles.forEach(function(x){ if(x.pid===MS.pid) myRole=x.role; });
+  var t=$('#endTitle');
+  if(myRole){
+    var win=(ROLES[myRole].team===o.team);
+    t.textContent=win?'승리!':'패배...';
+    t.className='big '+(win?'win':'lose');
+  }else{
+    t.textContent='게임 종료'; t.className='big';
+  }
+  $('#endDesc').innerHTML=(o.team==='mafia'?'<b>마피아팀</b>이 승리했습니다.':'<b>시민팀</b>이 승리했습니다.')+
+    (myRole?('<br>당신의 직업: <b>'+ROLES[myRole].e+' '+ROLES[myRole].n+'</b>'):'');
+  var ul=$('#endList'); ul.innerHTML='';
+  o.roles.forEach(function(x){
+    var p=MS.pmap[x.pid]||{name:'?',av:'❔'};
+    var li=document.createElement('li');
+    li.className=(x.pid===MS.pid?'mine ':'')+(x.alive?'':'gone');
+    li.innerHTML='<span class="e">'+esc(p.av)+'</span><span class="n">'+esc(p.name)+
+      (x.pid===MS.pid?' (나)':'')+(x.alive?'':' 💀')+'</span><span class="r '+ROLES[x.role].team+'">'+
+      ROLES[x.role].e+' '+ROLES[x.role].n+'</span>';
+    ul.appendChild(li);
+  });
+  $('#againBtn').textContent=MS.isHost?'한 판 더':'방장 대기 중';
+  $('#againBtn').disabled=!MS.isHost;
+  document.body.className='over';
+  mpRedraw();
+  $('#endSheet').classList.add('show');
+}
+function mpMateSet(){var s={};MS.mates.forEach(function(m){s[m.pid]=1;});return s;}
+function mpCanPick(p){
+  if(!MV||!MS.playing||!MS.alive)return false;
+  if(!MS.mode)return false;
+  if(MS.mode==='heal')return p.alive;
+  if(!p.alive)return false;
+  if(MS.mode==='kill')return p.pid!==MS.pid&&!mpMateSet()[p.pid];
+  if(MS.mode==='inv')return p.pid!==MS.pid;
+  if(MS.mode==='vote')return true;
+  if(MS.mode==='poll'||MS.mode==='accuse')return p.pid!==MS.pid;
+  return false;
+}
+function mpOnPick(p){
+  var m=MS.mode;
+  if(m==='kill'){ MS.pick.kill=p.pid; MS.target=p.pid; hint('제거 대상: <b>'+esc(p.name)+'</b>'); mpSendEv({t:'pick',k:'kill',target:p.pid}); }
+  else if(m==='inv'){ MS.pick.inv=p.pid; MS.target=p.pid; hint('조사 대상: <b>'+esc(p.name)+'</b> — 아침에 결과가 나옵니다.'); mpSendEv({t:'pick',k:'inv',target:p.pid}); }
+  else if(m==='heal'){ MS.pick.heal=p.pid; MS.target=p.pid; hint('치료 대상: <b>'+esc(p.name)+'</b>'); mpSendEv({t:'pick',k:'heal',target:p.pid}); }
+  else if(m==='vote'){ MS.pick.vote=p.pid; MS.target=p.pid; hint('투표: <b>'+esc(p.name)+'</b> (변경 가능)'); mpSendEv({t:'vote',target:p.pid}); }
+  else if(m==='poll'){ MS.mode=null; hint('여론조사에 <b>'+esc(p.name)+'</b> 지목'); mpSendEv({t:'poll',target:p.pid}); }
+  else if(m==='accuse'){ MS.mode=null; mpSendEv({t:'accuse',target:p.pid}); }
+  mpRenderRoster(); mpRenderActions();
+}
+function mpPName(pid){var p=MS.pmap[pid];return p?p.name:'?';}
+function mpRenderRoster(){
+  var r=$('#roster'); r.innerHTML='';
+  if(!MV||!MV.players)return;
+  var over=(MV.ph==='end'&&MV.over);
+  var roleMap={};
+  if(over) MV.over.roles.forEach(function(x){roleMap[x.pid]=x.role;});
+  var iMafia=(MS.role==='mafia'), mset=mpMateSet();
+  MV.players.forEach(function(p){
+    var d=document.createElement('div');
+    var cls='pc';
+    if(p.pid===MS.pid)cls+=' me';
+    if(!p.alive)cls+=' dead';
+    if(iMafia&&MS.alive&&mset[p.pid]&&p.alive)cls+=' mate';
+    if(MS.target===p.pid)cls+=' sel';
+    var pickable=mpCanPick(p);
+    if(pickable)cls+=' pick';
+    d.className=cls;
+    var sub='';
+    if(over&&roleMap[p.pid]) sub=ROLES[roleMap[p.pid]].e+' '+ROLES[roleMap[p.pid]].n;
+    else if(p.pid===MS.pid&&MS.role) sub=ROLES[MS.role].e+' '+ROLES[MS.role].n;
+    else if(iMafia&&MS.alive&&mset[p.pid]) sub='🔪 동료';
+    else if(!p.alive) sub='사망';
+    else if(p.claimed) sub='"'+ROLES[p.claimed].n+'"';
+    else if(p.revealed==='politician') sub='🎩 정치인';
+    var badge='';
+    if(!p.alive) badge='<span class="badge x">✕</span>';
+    else if(MV.ph==='vote') badge=MV.hideTally?'<span class="badge">?</span>':((MV.tally&&MV.tally[p.pid])?'<span class="badge">'+MV.tally[p.pid]+'</span>':'');
+    else if(MV.ph==='discuss'&&MV.poll&&MV.poll[p.pid]) badge='<span class="badge poll">'+MV.poll[p.pid]+'</span>';
+    d.innerHTML='<span class="av">'+esc(p.av)+'</span><span class="nm">'+esc(p.name)+'</span><span class="rl">'+esc(sub)+'</span>'+badge;
+    if(pickable) d.onclick=function(){ mpOnPick(p); };
+    r.appendChild(d);
+  });
+}
+function mpRenderActions(){
+  var a=$('#actions'); a.innerHTML='';
+  if(!MV)return;
+  function btn(label,fn,cls,dis){
+    var b=document.createElement('button');
+    b.className='ab'+(cls?' '+cls:''); b.textContent=label;
+    if(dis)b.disabled=true; else b.onclick=fn;
+    a.appendChild(b); return b;
+  }
+  if(MV.ph==='end'||MV.ph==='lobby')return;
+  if(!MS.playing){ hint('👀 관전 중입니다.'); return; }
+  if(!MS.alive){ hint('💀 사망 — 사망자 채팅으로 관전합니다.'); return; }
+  var ph=MV.ph;
+  if(ph==='night'){
+    if(MS.role==='mafia'){
+      btn(MS.pick.kill?('대상: '+mpPName(MS.pick.kill)):'제거 대상 선택',function(){
+        MS.mode='kill'; hint('명단에서 제거할 사람을 고르세요.'); mpRenderRoster(); mpRenderActions();
+      },MS.mode==='kill'?'on':'');
+      if(!MS.mode&&!MS.pick.kill) hint('🔪 밤 — 제거할 대상을 고르고, 비밀 채팅으로 동료와 상의하세요.');
+    }else if(MS.role==='police'){
+      btn(MS.pick.inv?('조사: '+mpPName(MS.pick.inv)):'조사 대상 선택',function(){
+        MS.mode='inv'; hint('조사할 사람을 고르세요.'); mpRenderRoster(); mpRenderActions();
+      },MS.mode==='inv'?'on':'');
+      if(!MS.mode&&!MS.pick.inv) hint('🔎 밤 — 조사할 대상을 고르세요.');
+    }else if(MS.role==='doctor'){
+      btn(MS.pick.heal?('치료: '+mpPName(MS.pick.heal)):'치료 대상 선택',function(){
+        MS.mode='heal'; hint('치료할 사람을 고르세요. (자신도 가능)'); mpRenderRoster(); mpRenderActions();
+      },MS.mode==='heal'?'on':'');
+      if(!MS.mode&&!MS.pick.heal) hint('💉 밤 — 치료할 대상을 고르세요.');
+    }else if(MS.role){
+      hint(ROLES[MS.role].e+' '+ROLES[MS.role].n+' — 밤에 쓸 능력이 없습니다. 아침을 기다리세요.');
+    }
+  }else if(ph==='discuss'){
+    btn(MS.claimed?'공개함':'직업 공개',function(){ mpSendEv({t:'claim'}); },'',!!MS.claimed);
+    btn('마피아 지목',function(){ MS.mode=(MS.mode==='accuse'?null:'accuse'); hint(MS.mode?'마피아라고 생각하는 사람을 고르세요.':''); mpRenderRoster(); mpRenderActions(); },MS.mode==='accuse'?'on':'');
+    btn('여론조사',function(){ MS.mode=(MS.mode==='poll'?null:'poll'); hint(MS.mode?'여론조사로 지목할 사람을 고르세요. (진행에 영향 없음)':''); mpRenderRoster(); mpRenderActions(); },MS.mode==='poll'?'on':'');
+    var dk=MV.g+'_'+MV.day, used=(MS.extDay===dk);
+    btn(used?'시간 사용함':'＋15초',function(){ MS.extDay=dk; mpSendEv({t:'ext',d:1}); mpRenderActions(); },'',used);
+    btn(used?'―':'－15초',function(){ MS.extDay=dk; mpSendEv({t:'ext',d:-1}); mpRenderActions(); },'',used);
+    if(!MS.mode&&!$('#hintBar').innerHTML) hint('💬 토론 — 자유롭게 말하세요.');
+  }else if(ph==='vote'){
+    MS.mode='vote';
+    hint(MS.pick.vote?('투표: <b>'+esc(mpPName(MS.pick.vote))+'</b> (변경 가능)'):'🗳 명단에서 투표할 사람을 고르세요. 자기 자신도 가능합니다.');
+  }else if(ph==='defense'){
+    if(MV.accused===MS.pid) hint('🎤 당신의 최후의 반론입니다. 아래에 입력하세요.');
+    else hint(mpPName(MV.accused)+'님의 최후의 반론을 듣는 중입니다.');
+  }else if(ph==='judge'){
+    if(MV.accused===MS.pid){ hint('당신에 대한 찬반 투표 중입니다. 결과를 기다리세요.'); return; }
+    btn('찬성 (처형)',function(){ MS.judged=true; hint('찬성했습니다.'); mpSendEv({t:'judge',v:true}); mpRenderActions(); },'yes');
+    btn('반대 (생존)',function(){ MS.judged=true; hint('반대했습니다.'); mpSendEv({t:'judge',v:false}); mpRenderActions(); },'no');
+    if(!MS.judged) hint(mpPName(MV.accused)+'님을 처형할까요? 동수면 처형됩니다.');
+  }
+}
+function mpRenderInput(){
+  var i=$('#chatIn');
+  i.className='';
+  if(!MV||MV.ph==='lobby'||MV.ph==='end'){ i.disabled=true; i.placeholder=MV&&MV.ph==='end'?'게임이 끝났습니다':''; return; }
+  if(!MS.playing){ i.disabled=true; i.placeholder='관전 중입니다'; return; }
+  if(!MS.alive){ i.disabled=false; i.className='dead'; i.placeholder='사망자 채팅 (산 사람은 못 봅니다)'; return; }
+  if(MV.ph==='night'){
+    if(MS.role==='mafia'){ i.disabled=false; i.className='mafia'; i.placeholder='마피아 비밀 채팅'; }
+    else { i.disabled=true; i.placeholder='밤에는 말할 수 없습니다'; }
+    return;
+  }
+  if(MV.ph==='defense'){
+    if(MV.accused===MS.pid){ i.disabled=false; i.placeholder='최후의 반론을 입력하세요'; }
+    else { i.disabled=true; i.placeholder=mpPName(MV.accused)+'님만 말할 수 있습니다'; }
+    return;
+  }
+  if(MV.ph==='discuss'||MV.ph==='vote'){ i.disabled=false; i.placeholder='메시지 입력'; return; }
+  i.disabled=true; i.placeholder='';
+}
+var PH_LABEL={lobby:'대기실',reveal:'직업 확인',night:'밤',result:'결과 발표',discuss:'토론',
+  vote:'투표',defense:'최후의 반론',judge:'찬반 투표',gap:'정리',end:'게임 종료'};
+function mpRenderAll(){
+  if(!MV)return;
+  $('#phaseName').textContent=PH_LABEL[MV.ph]||MV.ph;
+  $('#dayNum').textContent=MV.day?(MV.day+'일차'):'';
+  if(MV.ph==='end') document.body.className='over';
+  else document.body.className=(MV.ph==='night'||MV.ph==='reveal'||MV.ph==='lobby')?'night':'day';
+  $('#skipBtn').style.display='none';   // 멀티에는 건너뛰기 없음 (타이머로만 진행)
+  mpRenderActions(); mpRenderRoster(); mpRenderInput();
+}
+function mpTick(){
+  if(!MV)return;
+  var t=$('#timer');
+  if(!MV.endsAt||MV.ph==='lobby'||MV.ph==='end'){ t.textContent='--'; t.className=''; return; }
+  var rem=Math.max(0,MV.endsAt-(Date.now()+MS.offset));
+  t.textContent=Math.ceil(rem/1000);
+  t.className=rem<=5000?'low':'';
+  if(MV.ph==='vote'&&!MV.hideTally&&rem<=5000){ MV.hideTally=true; mpRenderRoster(); }
+}
+function mpSend(){
+  var i=$('#chatIn');
+  var v=i.value.trim();
+  if(!v||i.disabled)return;
+  i.value='';
+  mpSendEv({t:'chat',x:v.slice(0,60)});
+}
+
+/* =========================================================================
+   접속 / 방 만들기 / 입장 / 나가기
+   ========================================================================= */
+function mpMsg(t,bad){ var e=$('#mpMsg'); e.className='lead'+(bad?' err':''); e.innerHTML=t||''; }
+function setNet(s){
+  MS.net=s;
+  var d=$('#netDot'); d.hidden=false;
+  d.className=(s==='on')?'on':(s==='idle'?'':'off');
+}
+function mpPrepare(){
+  MODE='multi';
+  if(!MS) MS=newSession();
+  LINK.setId(MS.pid);                       // 나갔다 다시 들어오면 pid가 바뀐다
+  if(MS.net==='on') return Promise.resolve();
+  return LINK.ready(MS.pid,setNet).then(function(){ setNet('on'); });
+}
+function mpCreate(){
+  var nick=mclean($('#mpNick').value);
+  mpMsg('연결 중…');
+  mpPrepare().then(function(){
+    MS.name=nick; MS.isHost=true;
+    MS.code=mrid(5);
+    MS.av=pick(AVS);
+    G={host:MS.pid,players:{},order:[],phase:'lobby',day:0,gameNo:0,endsAt:0,
+       accused:null,votes:{},judge:{},poll:{},picks:{},ext:{},over:null,
+       lastKill:null,seq:0,dirty:true,lastPub:0};
+    G.players[MS.pid]={pid:MS.pid,name:nick,av:MS.av,seen:Date.now(),playing:false,alive:false,
+      role:null,shield:false,claimed:null,revealed:null,key:null};
+    G.order.push(MS.pid);
+    LINK.openHost(MS.code,{onAction:hostEv});
+    mpEnterGameUI();
+    startClock();
+    hostPublish();
+    mpMsg('');
+    $('#mpSheet').classList.remove('show');
+    history.replaceState(null,'',location.pathname+'#'+MS.code);
+  })['catch'](function(e){
+    console.error(e);
+    mpMsg('서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 다른 네트워크에서 열어 보세요.',true);
+  });
+}
+function mpJoin(){
+  var nick=mclean($('#mpNick').value);
+  var code=($('#mpCode').value||'').trim().toUpperCase();
+  if(code.length!==5){ mpMsg('방 코드 5자리를 입력하세요.',true); return; }
+  mpMsg('연결 중…');
+  mpPrepare().then(function(){
+    MS.name=nick; MS.isHost=false; MS.code=code; MS.lastState=0;
+    LINK.openGuest(code,{onState:applyState,onPublic:mpOnPub,onPrivate:mpOnPriv});
+    LINK.join(nick);
+    mpMsg('방 찾는 중…');
+    startClock();
+    var waited=0;
+    var iv=setInterval(function(){
+      waited+=250;
+      if(MS.lastState){ clearInterval(iv); mpMsg(''); $('#mpSheet').classList.remove('show'); mpEnterGameUI();
+        history.replaceState(null,'',location.pathname+'#'+MS.code); return; }
+      if(waited>6000){
+        clearInterval(iv);
+        LINK.close();
+        if(mpClockStop){ mpClockStop(); mpClockStop=null; } MS.code='';
+        mpMsg('그 코드의 방을 찾지 못했어요. 코드를 다시 확인해 주세요.',true);
+      }
+    },250);
+  })['catch'](function(e){
+    console.error(e);
+    mpMsg('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.',true);
+  });
+}
+function mpEnterGameUI(){
+  MODE='multi';
+  $('#modeSheet').classList.remove('show');
+  $('#startSheet').classList.remove('show');
+  $('#log').innerHTML='';
+  MS.msgs=[];
+  mpBuildHelp();
+  $('#skipBtn').style.display='none';
+}
+var lastClock=0;
+function mpClockTick(){
+  if(!MS||!MS.code)return;
+  var now=Date.now();
+  var gap=lastClock?(now-lastClock):0;
+  lastClock=now;
+  if(MS.isHost){
+    if(G&&G.players[MS.pid]) G.players[MS.pid].seen=now;
+    hostTick();
+  }else{
+    if(gap>3000&&MS.lastState) MS.lastState+=gap;   // 내 탭이 멈춰 있었던 시간은 빼고 센다
+    if(now-lastHb>=3500){
+      lastHb=now;
+      LINK.heartbeat(MS.name);
+    }
+    /* 방장은 1.2초마다 state를 올린다. 12초 넘게 소식이 없으면 방이 닫힌 것으로 본다.
+       (방장이 탭을 닫으면 unload 중 publish가 나가지 못하는 경우가 많다) */
+    if(MS.lastState&&now-MS.lastState>12000){ mpLeave('방장과 연결이 끊겨 방이 닫혔습니다.'); return; }
+  }
+  mpTick();
+}
+function startClock(){
+  if(mpClockStop)return;
+  lastHb=0; lastClock=0;
+  mpClockStop=makeClock(mpClockTick,200);
+}
+function mpLeave(msg){
+  if(!MS)return;
+  if(MS.code){
+    if(MS.isHost&&G){
+      G.order.forEach(function(pid){ LINK.clearPrivate(pid); });
+      LINK.closeRoom('방장이 나가 게임이 종료되었습니다.');
+    }else{
+      LINK.leave();
+    }
+    LINK.close();
+  }
+  if(mpClockStop){ mpClockStop(); mpClockStop=null; }
+  G=null; MV=null;
+  var keepNet=MS.net;
+  MS=newSession(); MS.net=keepNet;
+  MODE=null;
+  if(location.hash) history.replaceState(null,'',location.pathname);
+  document.body.className='night';
+  $('#log').innerHTML='';
+  $('#roster').innerHTML='';
+  $('#actions').innerHTML='';
+  $('#hintBar').innerHTML='';
+  $('#phaseName').textContent='준비';
+  $('#dayNum').textContent='';
+  $('#timer').textContent='--';
+  $('#timer').className='';
+  $('#chatIn').disabled=true; $('#chatIn').placeholder='메시지 입력';
+  $('#netDot').hidden=true;
+  $('#skipBtn').style.display='';
+  $('#lobbySheet').classList.remove('show');
+  $('#roleSheet').classList.remove('show');
+  $('#endSheet').classList.remove('show');
+  $('#againBtn').disabled=false; $('#againBtn').textContent='다시하기';
+  if(msg){ $('#mpSheet').classList.add('show'); mpMsg(msg,true); }
+  else { $('#modeSheet').classList.add('show'); mpMsg(''); }
+}
+function mpBuildHelp(){
+  var h=$('#helpBody');
+  var html='<p class="lead"><b>멀티플레이 — 4~8인</b><br>';
+  [4,5,6,7,8].forEach(function(n){ html+=n+'인: '+esc(compText(n))+'<br>'; });
+  html+='진행: 밤 → 결과 발표 → 토론 → 투표 → 최후의 반론 → 찬반 투표 → 다시 밤<br>'+
+    '<b>마피아 승리</b>: 마피아 수 ≥ 시민 수 · <b>시민 승리</b>: 마피아 전멸<br>'+
+    '죽은 사람의 직업은 공개되지 않습니다. 멀티에는 건너뛰기가 없고 페이즈는 타이머로만 넘어갑니다.<br>'+
+    '개인 정보(직업·동료·조사 결과·비밀 채팅)는 <b>수신자 공개키로 암호화</b>되어 전송됩니다. '+
+    '방장의 권한은 게임 시작과 한 판 더 뿐이고, 게임에는 다른 참가자와 똑같이 참여합니다.</p>';
+  ROLE_ORDER.forEach(function(k){
+    var r=ROLES[k];
+    html+='<div class="roleRow"><div class="e">'+r.e+'</div><div><h4>'+r.n+
+      '<small>'+(r.team==='mafia'?'마피아팀':'시민팀')+'</small></h4><p>'+r.d+'</p></div></div>';
+  });
+  h.innerHTML=html;
+}
+function copyText(t,btn){
+  var done=function(){ var o=btn.textContent; btn.textContent='복사됨'; setTimeout(function(){btn.textContent=o;},1200); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done)['catch'](function(){ fallbackCopy(t); done(); });
+  }else{ fallbackCopy(t); done(); }
+}
+function fallbackCopy(t){
+  var ta=document.createElement('textarea');
+  ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+
+/* ================= 화면 전환 · 공용 핸들러 ================= */
+function showHelp(){
+  if(MODE==='multi') mpBuildHelp(); else buildHelp();
+  $('#helpSheet').classList.add('show');
+}
+$('#modeSingle').onclick=function(){
+  $('#modeSheet').classList.remove('show');
+  $('#startSheet').classList.add('show');
+};
+$('#modeMulti').onclick=function(){
+  if(!secureOK())return;
+  $('#modeSheet').classList.remove('show');
+  $('#mpSheet').classList.add('show');
+  mpMsg('');
+  var pre=(location.hash||'').replace('#','').toUpperCase().slice(0,5);
+  if(pre.length===5) $('#mpCode').value=pre;
+  setTimeout(function(){ $('#mpNick').focus(); },50);
+};
+$('#startX').onclick=function(){
+  $('#startSheet').classList.remove('show');
+  $('#modeSheet').classList.add('show');
+};
+$('#mpX').onclick=function(){
+  $('#mpSheet').classList.remove('show');
+  $('#modeSheet').classList.add('show');
+};
+$('#lobbyX').onclick=function(){
+  if(MS&&MS.isHost&&!confirm('방장이 나가면 방이 닫힙니다. 나갈까요?'))return;
+  mpLeave();
+};
+$('#copyBtn').onclick=function(){ copyText(inviteLink(),this); };
+$('#mpCreate').onclick=mpCreate;
+$('#mpJoin').onclick=mpJoin;
+$('#lobbyStart').onclick=function(){ mpSendEv({t:'start'}); };
+$('#mpCode').addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();mpJoin();} });
+$('#mpNick').addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();mpCreate();} });
+
+$('#startBtn').onclick=function(){ MODE='single'; begin(); };
+$('#againBtn').onclick=function(){
+  if(MODE==='multi'){
+    if(MS&&MS.isHost){ $('#endSheet').classList.remove('show'); mpSendEv({t:'again'}); }
+    return;
+  }
+  $('#endSheet').classList.remove('show'); $('#startSheet').classList.add('show');
+};
+$('#roleOk').onclick=function(){
+  $('#roleSheet').classList.remove('show');
+  if(MODE==='multi')return;                       // 멀티는 방장 타이머가 밤을 연다
+  sys('게임을 시작합니다. 8인 클래식전 — 마피아 2명이 섞여 있습니다.');
+  startNight();
+};
+$('#rulesBtn').onclick=showHelp;
+$('#rulesBtn2').onclick=showHelp;
+$('#helpBtn').onclick=showHelp;
+$('#helpX').onclick=$('#helpX2').onclick=function(){ $('#helpSheet').classList.remove('show'); };
+$('#skipBtn').onclick=function(){ if(MODE!=='multi') skip(); };
+$('#sendBtn').onclick=function(){ if(MODE==='multi') mpSend(); else sendMsg(); };
+$('#chatIn').addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  if(MODE==='multi') mpSend(); else sendMsg();
+});
+$('#nick').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); MODE='single'; begin(); } });
+
+window.addEventListener('pagehide',function(){
+  if(MODE==='multi'&&MS&&MS.code){
+    if(MS.isHost) LINK.closeRoom('방장이 나가 게임이 종료되었습니다.');
+    else LINK.leave();
+  }
+});
+
+/* 멀티는 보안 컨텍스트(https / localhost)에서만 — crypto.subtle이 없으면 막는다 */
+(function(){
+  if(secureOK())return;
+  var b=$('#modeMulti');
+  b.disabled=true;
+  $('#modeMultiDesc').innerHTML='친구들과 방을 만들어 함께 하는 마피아. 4~8인.<br>'+
+    '<b style="color:var(--accent)">멀티플레이는 배포 주소(https)에서만 됩니다.</b> '+
+    '파일을 직접 연 상태(file://)에서는 암호화를 쓸 수 없어 비활성화됩니다.';
+})();
+
+buildHelp();
+
+// 디버그 방지용: 상태는 클로저 안에만 존재
+})();
+</script>
+</body>
+</html>
