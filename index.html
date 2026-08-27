@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UK's Game — 게임 허브</title>
+<meta name="description" content="내가 만든 게임들을 한 곳에 모아둔 게임 허브">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <h1 class="logo">UK's GAME</h1>
+    <p class="tagline">🕹️ 내가 만든 게임들을 한 곳에서</p>
+    <div class="stats">
+      <span class="pill">전체 <b id="statTotal">0</b></span>
+      <span class="pill">플레이 가능 <b id="statReady">0</b></span>
+      <span class="pill">준비중 <b id="statWip">0</b></span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input id="search" class="search" type="search" placeholder="게임 이름 · 태그 검색…" autocomplete="off">
+    <div class="filters" id="filters"></div>
+  </div>
+
+  <main class="grid" id="grid"></main>
+
+</div>
+
+<footer>UK's Game · 게임을 추가하려면 <code>data/games.js</code> 에 항목 하나만 추가하세요</footer>
+
+<script src="data/games.js"></script>
+<script>
+(function () {
+  const games   = window.GAMES || [];
+  const grid    = document.getElementById('grid');
+  const search  = document.getElementById('search');
+  const filters = document.getElementById('filters');
+
+  let keyword = '';
+  let tagFilter = '전체';
+
+  // ---- 통계 ----
+  document.getElementById('statTotal').textContent = games.length;
+  document.getElementById('statReady').textContent = games.filter(g => g.status === 'ready').length;
+  document.getElementById('statWip').textContent   = games.filter(g => g.status !== 'ready').length;
+
+  // ---- 태그 필터 버튼 ----
+  const allTags = ['전체', ...new Set(games.flatMap(g => g.tags || []))];
+  filters.innerHTML = allTags
+    .map(t => `<button class="chip${t === '전체' ? ' on' : ''}" data-tag="${t}">${t}</button>`)
+    .join('');
+
+  filters.addEventListener('click', e => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    tagFilter = btn.dataset.tag;
+    filters.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === btn));
+    render();
+  });
+
+  search.addEventListener('input', e => {
+    keyword = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  // ---- 카드 렌더링 ----
+  function cardHTML(g) {
+    const ready = g.status === 'ready';
+    const [c1, c2] = g.color || ['#3b82f6', '#8b5cf6'];
+    const tags = (g.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+
+    return `
+      <a class="card${ready ? '' : ' locked'}"
+         ${ready ? `href="${g.path}"` : 'aria-disabled="true"'}>
+        <div class="thumb" style="background:linear-gradient(135deg,${c1},${c2})">
+          <span>${g.emoji || '🎮'}</span>
+          <em class="badge ${ready ? 'ready' : 'wip'}">${ready ? 'PLAY' : '준비중'}</em>
+        </div>
+        <div class="body">
+          <div class="title">${g.title}</div>
+          <div class="desc">${g.desc || ''}</div>
+          <div class="tags">${tags}</div>
+          <div class="play">${ready ? '지금 플레이' : '제작 예정'} <span class="arrow">→</span></div>
+        </div>
+      </a>`;
+  }
+
+  function render() {
+    const list = games.filter(g => {
+      const inTag = tagFilter === '전체' || (g.tags || []).includes(tagFilter);
+      const hay = [g.title, g.desc, ...(g.tags || [])].join(' ').toLowerCase();
+      return inTag && hay.includes(keyword);
+    });
+
+    grid.innerHTML = list.length
+      ? list.map(cardHTML).join('')
+      : `<div class="empty"><div class="big">🔍</div>조건에 맞는 게임이 없습니다.</div>`;
+  }
+
+  render();
+
+  // 준비중인 게임 클릭 방지
+  grid.addEventListener('click', e => {
+    const c = e.target.closest('.card.locked');
+    if (c) e.preventDefault();
+  });
+})();
+</script>
+</body>
+</html>
