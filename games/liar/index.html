@@ -98,7 +98,20 @@ body{
 .btn.ghost:hover{border-color:var(--accent)}
 .btn.gold{background:linear-gradient(180deg,#ffdf8a,#e0a92f);color:#2a1c00}
 .foot{flex:none;display:flex;flex-direction:column;gap:7px;padding-top:2px}
-.ver{font-size:10px;color:#5b6480;text-align:center;letter-spacing:.04em;padding:2px 0 4px}
+.ptRow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.verBtn{position:relative;flex:none;background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+  color:var(--muted);font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:.03em;
+  padding:5px 11px;cursor:pointer;min-height:28px}
+/* 칩은 작게 보이되 터치 영역은 44px 높이 (.back·.ic 와 같은 방식) */
+.verBtn::after{content:"";position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:44px}
+.verBtn:hover{color:var(--text);border-color:var(--accent)}
+.verBtn:active{transform:translateY(1px)}
+.vsec{display:flex;flex-direction:column;gap:5px}
+.vsec h4{font-size:12.5px;font-weight:800;color:var(--accent)}
+.vsec ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.vsec li{font-size:11.5px;line-height:1.7;color:var(--muted);word-break:keep-all;
+  padding-left:11px;position:relative}
+.vsec li::before{content:"·";position:absolute;left:2px;color:var(--accent);font-weight:800}
 /* ---- 커버(기기 넘기기) ---- */
 .cover{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px}
@@ -220,7 +233,10 @@ body{
     <!-- ========== 설정 ========== -->
     <section class="sc show" id="scSetup">
       <div class="pan">
-        <div class="pt">🕵️ 라이어 게임</div>
+        <div class="ptRow">
+          <div class="pt">🕵️ 라이어 게임</div>
+          <button class="verBtn" id="verBtn" aria-label="버전 기록 보기">v<span id="verNow">-</span></button>
+        </div>
         <p class="lead">기기 <b>한 대</b>를 돌려가며 하는 파티 게임.<br>
           한 명만 제시어를 모릅니다. 설명과 토론은 <b>사람이 직접</b>, 앱은 제시어 전달과 투표만 맡습니다.</p>
       </div>
@@ -299,7 +315,6 @@ body{
       <div class="foot">
         <button class="btn" id="startBtn">게임 시작</button>
         <button class="btn ghost" id="rulesBtn">규칙 보기</button>
-        <div class="ver">v1.0.0</div>
       </div>
     </section>
 
@@ -374,6 +389,16 @@ body{
       </div>
     </section>
 
+  </div>
+</div>
+
+<!-- 버전 기록 -->
+<div class="sheet" id="verSheet">
+  <div class="card">
+    <div class="cardHead"><h2>버전 기록</h2><button class="ic" id="verX" aria-label="닫기">✕</button></div>
+    <p class="lead">현재 버전 <b>v<span id="verNow2">-</span></b></p>
+    <div class="scroll" id="verList"></div>
+    <button class="btn ghost" id="verX2">닫기</button>
   </div>
 </div>
 
@@ -643,6 +668,32 @@ document.addEventListener('click',function(e){
   renderSegs();saveStore();
 });
 $('#resetScore').onclick=function(){scores={};renderSetupScore();saveStore();};
+/* ================= 버전 기록 ================= */
+var VERSION='1.0.1';
+var CHANGELOG=[
+ {v:'1.0.1',t:['버전 기록 버튼 추가 (첫 화면 제목 오른쪽)',
+               '허브 복귀·규칙 버튼의 터치 영역을 44px로 넓히고 접근성 이름(aria-label) 추가',
+               '코드 정리 — 기기를 넘길 때 나오는 커버 화면 3벌을 하나로 통합']},
+ {v:'1.0.0',t:['라이어 게임 첫 공개',
+               '한 기기를 돌려가며 하는 3~10인 패스 앤 플레이 — 설명과 토론은 사람이 직접',
+               '기본 / 바보 / 스파이 3가지 모드 (스파이는 5인 이상)',
+               '라이어 2명 옵션(6인 이상), 설명 바퀴·발언 제한·토론 시간 설정',
+               '제시어 8개 주제 x 40개',
+               '지목당한 라이어의 역전 추리 찬스, 동률이면 후보만 대상으로 재투표 1회',
+               '누적 점수판 (설정·점수는 이 기기에 저장)']}
+];
+function renderVer(){
+  $('#verList').innerHTML=CHANGELOG.map(function(c){
+    return '<div class="vsec"><h4>v'+c.v+'</h4><ul>'+
+      c.t.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>';
+  }).join('');
+}
+$('#verNow').textContent=VERSION;
+$('#verNow2').textContent=VERSION;
+$('#verBtn').onclick=function(){renderVer();$('#verSheet').classList.add('show');};
+$('#verX').onclick=$('#verX2').onclick=function(){$('#verSheet').classList.remove('show');};
+$('#verSheet').onclick=function(e){if(e.target===this)this.classList.remove('show');};
+
 $('#rulesBtn').onclick=function(){$('#helpSheet').classList.add('show');};
 $('#helpBtn').onclick=function(){$('#helpSheet').classList.add('show');};
 $('#helpX').onclick=$('#helpX2').onclick=function(){$('#helpSheet').classList.remove('show');};
