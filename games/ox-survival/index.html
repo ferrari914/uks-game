@@ -264,9 +264,6 @@
   @keyframes pop{0%{transform:scale(0) rotate(-40deg)}100%{transform:scale(1) rotate(0)}}
   .winner .ttl{font-family:var(--disp);font-size:15px;letter-spacing:.34em;color:var(--gold);margin:12px 0 4px}
   .winner .nm{font-family:var(--disp);font-size:clamp(26px,8vw,42px)}
-  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--gold);
-    border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:7px}
-  @keyframes sp{to{transform:rotate(360deg)}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -786,8 +783,9 @@ function closeChat(){
 function toggleChat(){S.chatOpen?closeChat():openChat()}
 
 /* ================= 버전 정보 ================= */
-var VERSION='1.3.1';
+var VERSION='1.3.2';
 var CHANGELOG=[
+ {v:'1.3.2',t:['내부 정리 — 화면을 다시 그리는 횟수와 낭비되는 타이머를 줄여 더 가볍게 동작합니다']},
  {v:'1.3.1',t:['연결이 한 번 끊기면 영영 복구되지 않던 문제 수정 — 되돌아오지 못하면 다른 브로커로 자동 전환',
                '방장 인터넷이 잠깐 끊겼을 때 참가자가 전원 튕겨나가 방이 해체되던 문제 수정',
                '방장이 다른 경로로 옮겨가면 참가자도 따라가도록 보완',
@@ -876,6 +874,7 @@ function renderLobby(){
   document.getElementById('lv').onclick=leaveRoom;
   document.getElementById('cp').onclick=function(e){copy(inviteLink(),e.target,'초대 링크 복사')};
   document.getElementById('cp2').onclick=function(e){copy(S.code,e.target,'코드만 복사')};
+  clearInterval(uiTimer);uiTimer=null;          // 로비에서는 100ms 타이머가 할 일이 없다
   document.getElementById('csend').onclick=function(){sendChat(document.getElementById('cmsg'))};
   document.getElementById('cmsg').onkeydown=function(e){if(e.key==='Enter')sendChat(document.getElementById('cmsg'))};
   paintLobby();
@@ -897,11 +896,18 @@ function paintLobby(){
   if(!V)return;
   var pl=document.getElementById('pl');if(!pl)return;
   document.getElementById('pc').textContent=V.players.length+'명';
-  pl.innerHTML=V.players.map(function(p){
-    return '<div class="pchip'+(p.pid===V.host?' host':'')+'"><span class="av">'+p.emoji+'</span><span>'+esc(p.name)+'</span>'+
-    (p.pid===V.host?'<span class="crown">방장</span>':'')+(p.pid===S.pid?'<span class="crown">나</span>':'')+'</div>';
-  }).join('');
+  var pk=V.host+'|'+V.players.map(function(p){return p.pid+p.name+p.emoji}).join(',');
+  if(pl.getAttribute('data-k')!==pk){
+    pl.setAttribute('data-k',pk);
+    pl.innerHTML=V.players.map(function(p){
+      return '<div class="pchip'+(p.pid===V.host?' host':'')+'"><span class="av">'+p.emoji+'</span><span>'+esc(p.name)+'</span>'+
+      (p.pid===V.host?'<span class="crown">방장</span>':'')+(p.pid===S.pid?'<span class="crown">나</span>':'')+'</div>';
+    }).join('');
+  }
   var hb=document.getElementById('hostbox');
+  var hk=S.isHost?('h|'+G.mode+'|'+G.qCount+'|'+G.timeLimit):('g|'+(V.mode||''));
+  if(hb.getAttribute('data-k')===hk){ paintChat(); return }
+  hb.setAttribute('data-k',hk);
   if(S.isHost){
     var surv=G.mode==='survival',unit=surv?'문제':'라운드';
     hb.innerHTML='<h3>게임 설정</h3><label class="lbl">게임 방식</label><div class="opt modes" id="md">'+
@@ -943,26 +949,31 @@ function renderGame(){
   '</div><div class="chars" id="ch"></div></div>'+
   '<div class="controls"><button class="pick o" id="pO">O</button><button class="pick x" id="pX">X</button></div>'+
   '<div class="statusbar" id="sb"></div><div id="dz"></div><div class="grave" id="gv"></div>';
-  document.getElementById('pO').onclick=function(){choose('O')};
-  document.getElementById('pX').onclick=function(){choose('X')};
+  GE={};['qno','ac','qt','tf','stg','sO','sX','ch','pO','pX','sb','dz','gv'].forEach(function(k){
+    GE[k]=document.getElementById(k);
+  });
+  GE.pO.onclick=function(){choose('O')};
+  GE.pX.onclick=function(){choose('X')};
   S.fxRd=null;
   clearInterval(uiTimer);uiTimer=setInterval(tickUI,100);
   paintGame();
 }
+var GE={};
+function geOk(){ return GE.qt&&GE.qt.isConnected }
 var chEls={};
 function paintGame(){
-  if(!V||!document.getElementById('qt'))return;
+  if(!V||!geOk())return;
   var aliveN=V.players.filter(function(p){return p.alive}).length;
   var scoreMode=V.mode==='score';
-  document.getElementById('qno').textContent=V.ph==='ready'?'준비'
+  GE.qno.textContent=V.ph==='ready'?'준비'
     :(scoreMode?'R ':'Q ')+(V.qi+1)+' / '+V.total;
-  var acEl=document.getElementById('ac');
+  var acEl=GE.ac;
   if(scoreMode){
     var mySc=null,topSc=0;
     V.players.forEach(function(p){if(p.pid===S.pid)mySc=p.sc||0;if((p.sc||0)>topSc)topSc=p.sc||0});
     acEl.textContent=(mySc===null?'':'내 점수 '+mySc+' · ')+'최고 '+topSc+'점';
   }else acEl.textContent='생존 '+aliveN+'명';
-  document.getElementById('qt').textContent=V.ph==='ready'?'다음 문제 준비…':(V.q||'');
+  GE.qt.textContent=V.ph==='ready'?'다음 문제 준비…':(V.q||'');
 
   setSlabFx();
 
@@ -973,7 +984,7 @@ function paintGame(){
     if(p.pid===S.pid&&S.myChoice&&p.alive)c=S.myChoice;
     g[c==='O'?'O':c==='X'?'X':'W'].push(p);
   });
-  var live={},box=document.getElementById('ch');
+  var live={},box=GE.ch;
   ['O','X','W'].forEach(function(z){
     g[z].forEach(function(p,i){
       live[p.pid]=1;
@@ -997,12 +1008,12 @@ function paintGame(){
 
   var me=null;V.players.forEach(function(p){if(p.pid===S.pid)me=p});
   var can=me&&me.alive&&V.ph==='question';
-  var bO=document.getElementById('pO'),bX=document.getElementById('pX');
+  var bO=GE.pO,bX=GE.pX;
   bO.disabled=bX.disabled=!can;
   var mine=S.myChoice||(me&&me.choice);
   bO.setAttribute('aria-pressed',mine==='O');bX.setAttribute('aria-pressed',mine==='X');
 
-  var sb=document.getElementById('sb');
+  var sb=GE.sb;
   if(V.ph==='ready')sb.innerHTML='곧 문제가 나옵니다.';
   else if(V.ph==='question'){
     if(!me)sb.innerHTML='관전 중';
@@ -1018,7 +1029,7 @@ function paintGame(){
   else if(V.ph==='reveal')sb.innerHTML=V.mercy?'전원 오답! 심판이 봐줬습니다. 이번 라운드는 <b>무효</b>'
     :'정답은 <b>'+V.ans+'</b>'+(scoreMode?' — 맞힌 사람은 <b>+1점</b>':'');
 
-  var dz=document.getElementById('dz');
+  var dz=GE.dz;
   if(V.ph==='reveal'&&V.deaths&&V.deaths.length){
     var dk=V.rd+'|'+V.deaths.length;
     if(dz.getAttribute('data-k')!==dk){          // 매 publish마다 다시 그리면 애니메이션이 끊긴다
@@ -1030,12 +1041,17 @@ function paintGame(){
     }
   }else if(dz.innerHTML){dz.innerHTML='';dz.setAttribute('data-k','')}
 
-  document.getElementById('gv').innerHTML=V.players.filter(function(p){return !p.alive&&p.dr!==V.rd})
-    .map(function(p){return '<span class="g" title="'+esc(p.death||'')+'">'+p.emoji+' '+esc(p.name)+'</span>'}).join('');
+  var gone=V.players.filter(function(p){return !p.alive&&p.dr!==V.rd});
+  var gk=gone.map(function(p){return p.pid}).join(',');
+  if(GE.gv.getAttribute('data-k')!==gk){          // 대개 그대로다 — 매 발행마다 다시 그릴 이유가 없다
+    GE.gv.setAttribute('data-k',gk);
+    GE.gv.innerHTML=gone.map(function(p){
+      return '<span class="g" title="'+esc(p.death||'')+'">'+p.emoji+' '+esc(p.name)+'</span>'}).join('');
+  }
 }
 /* ================= 탈락 연출 ================= */
 function setSlabFx(){
-  var sO=document.getElementById('sO'),sX=document.getElementById('sX');
+  var sO=GE.sO,sX=GE.sX;
   if(!sO||!sX)return;
   var isRev=(V.ph==='reveal'&&!!V.ans);
   if(!isRev){
@@ -1063,13 +1079,13 @@ function setSlabFx(){
 }
 function quake(){
   if(REDUCED)return;
-  var st=document.getElementById('stg');if(!st)return;
+  var st=GE.stg;if(!st)return;
   st.classList.remove('quake');void st.offsetWidth;st.classList.add('quake');
   setTimeout(function(){st.classList.remove('quake')},620);
 }
 function spawnDebris(slabEl){
   if(REDUCED)return;
-  var st=document.getElementById('stg');if(!st)return;
+  var st=GE.stg;if(!st)return;
   var sr=st.getBoundingClientRect(),br=slabEl.getBoundingClientRect();
   var cx=br.left-sr.left+br.width/2,ty=br.top-sr.top;
   var base=slabEl.id==='sO'?'43,217,196':'255,77,109';
@@ -1108,8 +1124,9 @@ function confetti(box){
     for(var j=0;j<n.length;j++)n[j].remove();
   },4400);
 }
-function qLabel(dr){var m=/^\d+_(\d+)$/.exec(String(dr||''));return m?'Q'+m[1]:''}
-function drOrder(dr){var m=/^\d+_(\d+)$/.exec(String(dr||''));return m?+m[1]:999}
+var RD_RE=/^\d+_(\d+)$/;
+function qLabel(dr){var m=RD_RE.exec(String(dr||''));return m?'Q'+m[1]:''}
+function drOrder(dr){var m=RD_RE.exec(String(dr||''));return m?+m[1]:999}
 
 function slot(i,zone,total){
   var cols=zone==='W'?Math.min(6,Math.max(3,total)):4;
@@ -1128,7 +1145,7 @@ function choose(c){
 }
 function tickUI(){
   if(!V)return;
-  var tf=document.getElementById('tf');if(!tf)return;
+  var tf=GE.tf;if(!tf||!tf.isConnected)return;
   var total=V.ph==='question'?V.tl*1000:V.ph==='reveal'?5200:3400;
   var left=Math.max(0,V.endsAt-(Date.now()+S.offset));
   tf.style.width=Math.max(0,Math.min(100,left/total*100))+'%';
@@ -1159,20 +1176,17 @@ function renderOver(){
   var key='over|'+(V.rd||'')+'|'+((V.winner||[]).length);
   if(S.overKey===key&&document.getElementById('lv2'))return;   // 재발행마다 애니메이션 재생 방지
   S.overKey=key;
-  var w=V.winner||[],scoreMode=V.mode==='score';
+  var w=V.winner||[],scoreMode=V.mode==='score',one=w.length===1;
   var body;
-  if(scoreMode){
-    var ws=w.length?(w[0].score||0):0;
-    body=w.length===0?'<div class="av">🤷</div><div class="ttl">무 승 부</div><div class="nm">참가자 없음</div>'
-     :w.length===1?'<div class="av">'+w[0].emoji+'</div><div class="ttl">우 승</div><div class="nm">'+esc(w[0].name)+'</div>'+
-        '<div class="wsc">'+ws+'문제 정답</div>'
-     :'<div class="av">🏆</div><div class="ttl">공 동 우 승 '+w.length+'명</div><div class="nm">'+
-        w.map(function(p){return p.emoji+' '+esc(p.name)}).join('  ')+'</div><div class="wsc">'+ws+'문제 정답</div>';
+  if(!w.length){
+    body=scoreMode?'<div class="av">🤷</div><div class="ttl">무 승 부</div><div class="nm">참가자 없음</div>'
+                  :'<div class="av">🪦</div><div class="ttl">전 원 탈 락</div><div class="nm">생존자 없음</div>';
   }else{
-    body=w.length===0?'<div class="av">🪦</div><div class="ttl">전 원 탈 락</div><div class="nm">생존자 없음</div>'
-     :w.length===1?'<div class="av">'+w[0].emoji+'</div><div class="ttl">최 후 의 생 존 자</div><div class="nm">'+esc(w[0].name)+'</div>'
-     :'<div class="av">🏆</div><div class="ttl">공 동 우 승 '+w.length+'명</div><div class="nm">'+
-        w.map(function(p){return p.emoji+' '+esc(p.name)}).join('  ')+'</div>';
+    body='<div class="av">'+(one?w[0].emoji:'🏆')+'</div>'+
+      '<div class="ttl">'+(one?(scoreMode?'우 승':'최 후 의 생 존 자'):'공 동 우 승 '+w.length+'명')+'</div>'+
+      '<div class="nm">'+(one?esc(w[0].name)
+        :w.map(function(p){return p.emoji+' '+esc(p.name)}).join('  '))+'</div>'+
+      (scoreMode?'<div class="wsc">'+(w[0].score||0)+'문제 정답</div>':'');
   }
 
   var listHtml='';
