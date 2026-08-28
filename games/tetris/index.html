@@ -881,7 +881,7 @@ rankSheet.addEventListener('click',function(e){ if(e.target===rankSheet) closeSh
 nameSheet.addEventListener('click',function(e){ if(e.target===nameSheet) closeSheets(); });
 
 /* ---------- 부활 (영어 빈칸 문제) ---------- */
-/* 한 판에 딱 한 번. 정답이면 보드 위쪽 절반을 비우고 점수를 유지한 채 이어서 진행. */
+/* 한 판에 딱 한 번. 정답이면 보드를 전부 비우고 점수·레벨을 유지한 채 이어서 진행. */
 var QUIZ=[
  {k:'그 연구 결과는 우리의 가설을 뒷받침한다.',h:'뒷받침한다',e:'The findings ___ our hypothesis.',a:'support',d:['refuse','ignore','delay']},
  {k:'그는 자신의 실수를 인정할 만큼 겸손했다.',h:'인정할',e:'He was humble enough to ___ his mistake.',a:'admit',d:['deny','avoid','blame']},
@@ -970,7 +970,7 @@ function answerQuiz(q,w,btn,blank){
     quizCorrect=true;
     btn.classList.add('ok');
     quizRes.className='quizRes ok';
-    quizRes.textContent='정답! 위쪽을 정리하고 이어서 갑니다.';
+    quizRes.textContent='정답! 보드를 전부 비우고 이어서 갑니다.';
     quizDone.textContent='이어서 하기';
   } else {
     btn.classList.add('no');
@@ -989,8 +989,7 @@ function finishQuiz(){
   else declineRevive();   /* 오답 → 부활 실패. 이제 랭킹 등록을 열어준다 */
 }
 function doRevive(){
-  var cut=BUF+Math.floor(ROWS/2), y, x;
-  for(y=0;y<cut;y++) for(x=0;x<COLS;x++) board[y][x]=null;
+  board=makeBoard();   /* 보드를 전부 비운다. 레벨은 그대로라 절반만 비우면 금방 다시 죽는다 */
   combo=-1; b2b=false; canHold=true;
   piece=null; pending=null; clearRows=null; lastRun=null;
   dropTimer=0; lockTimer=0; lockResets=0; clearTimer=0;
@@ -1016,8 +1015,9 @@ quizClose.addEventListener('click',function(){ if(quizAnswered) finishQuiz(); el
 quizSheet.addEventListener('click',function(e){ if(e.target!==quizSheet) return; if(quizAnswered) finishQuiz(); else closeQuiz(); });
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.5.1';
+var VERSION='1.6.0';
 var CHANGELOG=[
+ {v:'1.6.0',t:['부활에 성공하면 보드를 전부 비운다 (기존에는 위쪽 절반만 비워, 낙하 속도가 그대로라 금방 다시 죽었다)']},
  {v:'1.5.1',t:['코드 최적화 — 화면이 바뀔 때만 다시 그리도록 개선(정지 화면에서 CPU·배터리 절약), 리사이즈 처리 통합']},
  {v:'1.5.0',t:['시작 화면과 결과 화면에 “홈으로” 버튼 추가 (일시정지 중에는 실수 방지를 위해 숨김)']},
  {v:'1.4.0',t:['일시정지 화면에 “게임 종료” 버튼 추가 (실수 방지를 위해 두 번 눌러야 종료)','게임오버 시 부활 여부를 먼저 묻고, 부활을 포기하거나 실패한 뒤에 랭킹 등록이 열리도록 변경','한 판에 랭킹이 두 번 등록되던 문제 수정']},
