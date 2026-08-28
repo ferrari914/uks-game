@@ -25,6 +25,14 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .btn.dan{border-color:#5a2733;color:#ff8a96}
 .btn:disabled{opacity:.4;cursor:default}
 .btn.sm{min-height:38px;padding:0 12px;font-size:13px;font-weight:500}
+/* 터치 타깃 44px. 상단 바에 칩 3개가 나란히 있어 실제 크기를 키우면 배치가 흔들린다.
+   보이는 상자는 그대로 두고 히트 영역만 넓힌다.
+   가로는 100%로 두고 min-width로만 보장한다 — 44px 고정으로 하면 좁은 버튼끼리 히트
+   영역이 겹친다. 상태 표시용 span.chip은 누를 게 없으므로 제외한다. */
+a.chip,button.chip,.btn.sm{position:relative}
+a.chip::after,button.chip::after,.btn.sm::after{content:"";position:absolute;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  width:100%;min-width:44px;height:44px}
 input{font:inherit;width:100%;min-height:46px;padding:0 14px;border-radius:12px;
   background:#10131f;border:1px solid var(--line);color:var(--tx)}
 input:focus{outline:2px solid var(--pt);outline-offset:-1px}
@@ -108,8 +116,11 @@ h1{margin:6px 0 2px;font-size:30px;letter-spacing:-.5px}
  * 오목 (렌주룰) — Englknight
  * 규칙 판정은 renju.js에 있다. 이 파일은 화면과 통신만 맡는다.
  * ============================================================ */
-var VERSION='1.0.0';
+var VERSION='1.0.1';
 var CHANGELOG=[
+ {v:'1.0.1',t:[
+   '상단 바 버튼(허브·규칙·버전)과 작은 버튼들의 터치 영역을 44px로 넓혔습니다 — 보이는 크기는 그대로입니다'
+ ]},
  {v:'1.0.0',t:[
    '오목 첫 공개 — 방 코드로 친구와 1:1 온라인 대국',
    '렌주룰 적용: 흑은 삼삼·사사·장목 금수, 정확히 5목만 승리 (백은 제한 없음)',
