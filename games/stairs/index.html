@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>무한의 계단 — Englknight</title>
+<meta name="description" content="버튼 두 개로 계단을 무한히 오르는 아케이드. 혼자 최고 층수에 도전하거나, 한 명 남을 때까지 겨루는 멀티플레이.">
+<meta property="og:title" content="무한의 계단 — Englknight">
+<meta property="og:description" content="멈추면 죽는다. 혼자 오르거나, 마지막 한 명이 될 때까지.">
+<style>
+:root{
+  --bg:#0a0b12; --card:#161927; --line:#262b40; --tx:#e8eaf2; --accent:#00e5ff;
+  --dim:#9aa3bd; --warn:#ff5470; --ok:#5ee7a0; --gold:#ffd166;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--bg); color:var(--tx); overflow-x:hidden;
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--accent)}
+
+/* ---------- 공통 레이아웃 ---------- */
+.wrap{max-width:520px;margin:0 auto;padding:14px 14px calc(24px + env(safe-area-inset-bottom))}
+.topbar{display:flex;align-items:center;gap:10px;min-height:48px}
+.hublink{
+  display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px;
+  border:1px solid var(--line);border-radius:12px;background:var(--card);
+  color:var(--dim);text-decoration:none;font-size:14px
+}
+.hublink:active{background:#1d2134}
+.grow{flex:1}
+
+h1{font-size:26px;line-height:1.25;margin:14px 0 4px;letter-spacing:-.5px}
+h1 .em{color:var(--accent)}
+.lead{color:var(--dim);font-size:14px;margin:0 0 14px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.cardHead{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.cardHead h2{font-size:17px;margin:0}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  min-height:52px;padding:0 16px;border:0;border-radius:14px;
+  background:var(--accent);color:#04202a;font-weight:800;font-size:16px
+}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx);font-weight:600}
+.btn.warn{background:var(--warn);color:#2a0410}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+
+input[type=text]{
+  width:100%;min-height:52px;padding:0 14px;border-radius:14px;
+  border:1px solid var(--line);background:#0f1220;color:var(--tx);font:inherit
+}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
+.lbl{display:block;font-size:13px;color:var(--dim);margin:0 0 6px}
+
+/* ---------- 버전 칩 ---------- */
+.verwrap{margin:10px 0 2px}
+.verchip{
+  display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  color:var(--dim);font-size:13px
+}
+.verchip b{color:var(--accent);font-weight:700}
+.sheet{position:fixed;inset:0;z-index:60;background:rgba(6,7,14,.82);display:flex;align-items:flex-end;justify-content:center}
+.sheet .vcard{
+  width:100%;max-width:520px;max-height:82vh;overflow:auto;background:var(--card);
+  border:1px solid var(--line);border-radius:18px 18px 0 0;
+  padding:16px 16px calc(20px + env(safe-area-inset-bottom))
+}
+.ic{
+  min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:12px;
+  background:transparent;color:var(--dim);font-size:16px
+}
+.verNow{color:var(--dim);font-size:13px;margin:0 0 10px}
+.verNow b{color:var(--tx)}
+.verList{list-style:none;margin:0;padding:0}
+.verList>li{border-top:1px solid var(--line);padding:10px 0}
+.verList h4{margin:0 0 4px;font-size:14px;color:var(--accent)}
+.verList ul{margin:0;padding-left:18px;color:var(--dim);font-size:13px}
+
+/* ---------- 모드 선택 ---------- */
+.mcard{
+  display:block;width:100%;text-align:left;margin:10px 0;padding:16px;
+  background:var(--card);border:1px solid var(--line);border-radius:16px;min-height:44px
+}
+.mcard:active{border-color:var(--accent)}
+.mcard h4{margin:0 0 4px;font-size:17px}
+.mcard p{margin:0;color:var(--dim);font-size:13px}
+
+/* ---------- 기록 / 명예의 전당 ---------- */
+.rec{display:flex;align-items:baseline;gap:8px;border-top:1px solid var(--line);padding:8px 0}
+.rec:first-child{border-top:0}
+.rec .rk{width:26px;color:var(--dim);font-size:13px;flex:none}
+.rec .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec .fl{font-weight:800;color:var(--accent)}
+.rec.me{color:var(--gold)}
+.rec.me .fl{color:var(--gold)}
+.tiny{color:var(--dim);font-size:12px;margin:8px 0 0;line-height:1.5}
+.empty{color:var(--dim);font-size:13px;padding:8px 0}
+.big{font-size:44px;font-weight:900;letter-spacing:-1px;line-height:1.1}
+.big small{font-size:16px;font-weight:700;color:var(--dim);margin-left:4px}
+
+/* ---------- 플레이 화면 ---------- */
+.play{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{
+  position:relative;z-index:2;
+  padding:calc(8px + env(safe-area-inset-top)) 64px 10px 14px;   /* 오른쪽은 나가기 버튼 자리 */
+  display:flex;align-items:center;gap:12px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,8,15,.92),rgba(7,8,15,.55) 70%,rgba(7,8,15,0));
+  text-shadow:0 1px 6px rgba(0,0,0,.8)
+}
+.hud .fl{font-size:32px;font-weight:900;letter-spacing:-1px;line-height:1}
+.hud .fl small{font-size:13px;color:var(--dim);font-weight:700;margin-left:3px}
+.gwrap{flex:1;display:flex;align-items:center;gap:8px}
+.gbar{flex:1;height:14px;border-radius:999px;background:#0f1220;border:1px solid var(--line);overflow:hidden}
+.gbar i{display:block;height:100%;width:100%;background:var(--accent);transition:background .2s}
+.gbar.low i{background:var(--warn)}
+.gpct{font-size:12px;color:var(--dim);width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.exit{position:absolute;z-index:3;right:10px;top:calc(8px + env(safe-area-inset-top));
+  min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:12px;background:rgba(22,25,39,.8);color:var(--dim)}
+.spacer{flex:1}
+.pads{position:relative;z-index:2;display:flex;gap:10px;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
+.pad{
+  flex:1;min-height:112px;border-radius:18px;border:1px solid var(--line);
+  background:rgba(22,25,39,.72);color:var(--tx);font-size:17px;font-weight:800;
+  touch-action:none;user-select:none;-webkit-user-select:none
+}
+.pad:active{background:rgba(0,229,255,.16);border-color:var(--accent)}
+.pad small{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-top:4px}
+.board{
+  position:absolute;z-index:2;right:10px;top:calc(74px + env(safe-area-inset-top));
+  width:150px;background:rgba(16,18,32,.86);border:1px solid var(--line);border-radius:14px;padding:8px 10px
+}
+.board h5{margin:0 0 6px;font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.5px}
+.board .b{display:flex;gap:6px;font-size:12px;line-height:1.7}
+.board .b .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .b .f{font-weight:800;font-variant-numeric:tabular-nums}
+.board .b.dead{color:#5c637d}
+.board .b.dead .f{color:#5c637d}
+.board .b.me .n{color:var(--accent)}
+.count{
+  position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;
+  font-size:96px;font-weight:900;color:var(--accent);text-shadow:0 0 40px rgba(0,229,255,.5)
+}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));
+  z-index:70;background:#1d2134;border:1px solid var(--line);border-radius:12px;
+  padding:10px 16px;font-size:14px;max-width:90vw
+}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0f1220;border:1px solid var(--line);font-size:12px;color:var(--dim)}
+.code{font-size:32px;font-weight:900;letter-spacing:6px;color:var(--accent);text-align:center;margin:6px 0}
+.plist{list-style:none;margin:8px 0 0;padding:0}
+.plist li{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.plist li .host{font-size:11px;color:var(--gold)}
+.st{font-size:12px;color:var(--dim)}
+.st b{color:var(--ok)}
+.st.off b{color:var(--warn)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheet"></div>
+<div id="toast"></div>
+<script>
+/* =========================================================================
+   무한의 계단 (Englknight)  —  games/stairs/index.html
+   스펙: games/stairs/SPEC.md
+   classic script만 쓴다 (file:// 더블클릭에서 열려야 하므로 ES 모듈 금지).
+   외부 의존은 mqtt.js CDN 하나뿐이고, 그것도 멀티·명예의 전당에서만 불러온다.
+   플레이 중에는 네트워크를 전혀 건드리지 않는다.
+   ========================================================================= */
+
+/* ---------- 버전 정보 ---------- */
+var VERSION='1.0.0';
+var CHANGELOG=[
+ {v:'1.0.0',t:['무한의 계단 첫 공개 — 버튼 2개(오르기 / 방향 전환)로 계단을 무한히 오른다',
+               '싱글플레이: 최고 층수 기록과 명예의 전당(전체 순위표)',
+               '멀티플레이: 2~8인이 같은 계단을 동시에 올라 한 명 남을 때까지 경쟁',
+               '체력 게이지 — 멈추면 줄고, 한 칸 오를 때마다 회복. 높이 오를수록 빨리 준다']}
+];
+
+/* ---------- 튜닝 (손맛은 전부 여기서 조정한다) ----------
+   기준점(사용자 확정): 300층에서 1초 망설이면 게이지 절반이 날아간다.
+     D(f) = d0 + span * ∛( min(1, f/capFloor) )   [%/초]
+     D(300) = 22 + 53*∛(0.15) = 50.2 %/초  ← 기준 충족
+   회복량 recover 는 전 구간 "유지에 필요한 속도"를 한 번에 움직이는 손잡이다.
+   감소만 올리고 회복을 낮게 두면 사람이 칠 수 없는 속도가 되므로 같이 잡아야 한다. */
+var TUNE={
+  gaugeMax:100,
+  recover:12,        // 한 칸 오를 때마다 회복 (%)
+  d0:22,             // 0층 초당 감소 (%)
+  span:53,           // 상한까지의 증가폭 → 2000층에서 75 %/초
+  capFloor:2000,     // 이 층부터 감소량 고정
+  turnProb:0.5,      // 다음 계단이 방향을 바꿀 확률
+  stepAnim:90        // 한 칸 이동 연출 시간 (ms) — 입력을 막지는 않는다
+};
+
+/* ---------- 잡동사니 ---------- */
+function $(s){return document.querySelector(s)}
+function esc(s){return String(s).replace(/[&<>"']/g,function(m){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
+function rid(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s='';
+  for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s}
+function cleanName(s){
+  var t=String(s||'').replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ ]/g,'').trim().slice(0,8);
+  return t||'익명';
+}
+function nowMs(){return Date.now()}
+var REDUCED=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+/* 시드 난수 — 멀티에서 전원이 같은 계단을 오르기 위해 쓴다 */
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    var t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+/* localStorage 는 사파리 프라이빗 등에서 던질 수 있다 — 전부 감싼다 */
+var store={
+  get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},
+  set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+};
+function getNick(){return store.get('stairs.nick','')}
+function setNick(v){store.set('stairs.nick',v)}
+
+/* 내 기록 — 오프라인에서도 항상 동작하는 주력 기록 */
+function myRecords(){
+  try{var a=JSON.parse(store.get('stairs.recs','[]'));return (a instanceof Array)?a:[]}catch(e){return []}
+}
+function addRecord(floor,mode){
+  var a=myRecords();
+  a.push({f:floor,m:mode||'single',t:nowMs()});
+  a.sort(function(x,y){return y.f-x.f});
+  a=a.slice(0,5);
+  store.set('stairs.recs',JSON.stringify(a));
+  return a;
+}
+function bestFloor(){var a=myRecords();return a.length?a[0].f:0}
+
+/* ---------- 토스트 ---------- */
+var toastT=null;
+function toast(msg){
+  var el=$('#toast');
+  el.innerHTML='<div class="toast">'+esc(msg)+'</div>';
+  if(toastT)clearTimeout(toastT);
+  toastT=setTimeout(function(){el.innerHTML=''},2600);
+}
+
+/* ---------- mqtt.js 지연 로딩 ---------- */
+var MQTT_CDN=['https://unpkg.com/mqtt@5.14.1/dist/mqtt.min.js',
+              'https://cdn.jsdelivr.net/npm/mqtt@5.14.1/dist/mqtt.min.js'];
+function loadMqtt(){
+  return new Promise(function(res,rej){
+    if(window.mqtt)return res();
+    var i=0;
+    (function next(){
+      if(i>=MQTT_CDN.length)return rej(new Error('mqtt-load'));
+      var sc=document.createElement('script');
+      sc.src=MQTT_CDN[i++]; sc.onload=function(){res()}; sc.onerror=next;
+      document.head.appendChild(sc);
+    })();
+  });
+}
+
+/* =========================================================================
+   명예의 전당 (전체 순위표)
+   서버가 없으므로 공용 MQTT 의 retain 메시지를 슬롯 10개로 쓴다 (방명록과 같은 기법).
+   브로커를 하나로 고정해야 목록이 갈라지지 않는다.
+
+   한계는 UI에 그대로 적는다:
+     · retain 은 영구 보관이 아니다 — 브로커가 재시작하면 비워질 수 있다
+     · 클라이언트가 자기 점수를 직접 올리는 구조라 검증되지 않는다
+   그래서 주력은 어디까지나 "내 기록"(localStorage)이고 이건 덤이다.
+   무엇보다 **여기가 죽어도 게임은 온전해야 한다** — 게임 시작 경로와 완전히 분리한다.
+   ========================================================================= */
+var HOF_BROKER='wss://broker.emqx.io:8084/mqtt';
+var HOF_TOPIC='eknight_stairs_hof_v1/';
+var HOF_SLOTS=10;
+
+var HOF=(function(){
+  var cl=null, slots=new Array(HOF_SLOTS), state='idle', waiters=[];
+  function list(){
+    var a=[];
+    for(var i=0;i<HOF_SLOTS;i++){
+      var e=slots[i];
+      if(e&&typeof e.f==='number'&&e.f>0)a.push({slot:i,n:e.n,f:e.f,t:e.t});
+    }
+    a.sort(function(x,y){return y.f-x.f||x.t-y.t});
+    return a;
+  }
+  function done(ok){
+    state=ok?'on':'fail';
+    var w=waiters; waiters=[];
+    w.forEach(function(fn){fn(ok?list():null)});
+  }
+  function open(cb){
+    if(state==='on')return cb(list());
+    waiters.push(cb);
+    if(state==='loading')return;
+    state='loading';
+    var settled=false;
+    var giveUp=setTimeout(function(){ if(!settled){settled=true;done(false)} },9000);
+    loadMqtt().then(function(){
+      var c=window.mqtt.connect(HOF_BROKER,{
+        clientId:'sthof_'+Math.random().toString(16).slice(2,10),
+        clean:true,reconnectPeriod:0,connectTimeout:7000,keepalive:30});
+      c.on('connect',function(){
+        cl=c;
+        c.subscribe(HOF_TOPIC+'+',{qos:0});
+        /* retain 메시지는 구독 직후 몰려 들어온다. 잠깐 기다렸다가 확정한다. */
+        setTimeout(function(){ if(!settled){settled=true;clearTimeout(giveUp);done(true)} },1500);
+      });
+      c.on('message',function(t,p){
+        var i=parseInt(t.slice(HOF_TOPIC.length),10);
+        if(isNaN(i)||i<0||i>=HOF_SLOTS)return;
+        var v=p.toString();
+        if(!v){slots[i]=null;return}
+        try{
+          var o=JSON.parse(v);
+          slots[i]={n:cleanName(o.n),f:Math.max(0,Math.floor(o.f)||0),t:+o.t||0};
+        }catch(e){}
+      });
+      c.on('error',function(){ if(!settled){settled=true;clearTimeout(giveUp);done(false)} });
+    })['catch'](function(){ if(!settled){settled=true;clearTimeout(giveUp);done(false)} });
+  }
+  return {
+    load:open,
+    ready:function(){return state==='on'},
+    /* 등재 자격: 빈 슬롯이 있거나, 가장 낮은 기록보다 높으면 된다 */
+    qualifies:function(floor){
+      if(state!=='on')return false;
+      var a=list();
+      if(a.length<HOF_SLOTS)return floor>0;
+      return floor>a[a.length-1].f;
+    },
+    submit:function(name,floor,cb){
+      if(state!=='on'||!cl)return cb(false);
+      var a=list(), target=-1;
+      if(a.length<HOF_SLOTS){                      // 빈 슬롯 먼저
+        var used={}; a.forEach(function(e){used[e.slot]=1});
+        for(var i=0;i<HOF_SLOTS;i++)if(!used[i]){target=i;break}
+      }
+      if(target<0){                                // 가장 낮은 기록을 밀어낸다
+        var last=a[a.length-1];
+        if(!last||floor<=last.f)return cb(false);
+        target=last.slot;
+      }
+      var e={n:cleanName(name),f:Math.floor(floor),t:nowMs()};
+      try{
+        cl.publish(HOF_TOPIC+target,JSON.stringify(e),{qos:0,retain:true});
+        slots[target]=e;
+        cb(true);
+      }catch(err){cb(false)}
+    }
+  };
+})();
+
+/* =========================================================================
+   게임 엔진
+   계단은 L(-1) / R(+1) 방향의 무한 수열이다. 시드가 같으면 계단도 같다.
+   판단 규칙: 다음 계단이 지금 방향과 같으면 [오르기], 반대면 [방향 전환].
+   ========================================================================= */
+function makeGame(seed){
+  var rnd=mulberry32(seed>>>0);
+  var dirs=[0];                        // dirs[i] = i번째 칸으로 가는 방향
+  function dir(i){
+    while(dirs.length<=i){
+      /* 첫 칸은 항상 정면이다. 시작하자마자 방향 전환을 요구하면
+         아직 화면을 못 읽은 상태에서 억울하게 죽는다. */
+      dirs.push(dirs.length===1?1:(rnd()<TUNE.turnProb?-1:1));
+    }
+    return dirs[i];
+  }
+  var xs=[0];
+  function xAt(i){
+    while(xs.length<=i)xs.push(xs[xs.length-1]+dir(xs.length));
+    return xs[i];
+  }
+  var G={
+    floor:0, facing:1, gauge:TUNE.gaugeMax,
+    started:false, dead:false, why:'', deadAt:0, wallSide:0,
+    dir:dir, xAt:xAt
+  };
+  G.drain=function(){                  // 지금 층의 초당 감소량 (%)
+    return TUNE.d0+TUNE.span*Math.cbrt(Math.min(1,G.floor/TUNE.capFloor));
+  };
+  G.die=function(why){
+    if(G.dead)return;
+    G.dead=true; G.why=why; G.deadAt=nowMs(); G.gauge=0;
+  };
+  /* act: 'up' | 'turn'.  애니메이션이 돌든 말든 즉시 처리한다 — 입력을 막지 않는다. */
+  G.act=function(a){
+    if(G.dead)return false;
+    var d=dir(G.floor+1);
+    var want=(d===G.facing)?'up':'turn';
+    if(a!==want){ G.wallSide=G.facing; G.die('wall'); return false }
+    if(a==='turn')G.facing=d;
+    G.floor++; xAt(G.floor);
+    G.gauge=Math.min(TUNE.gaugeMax,G.gauge+TUNE.recover);
+    if(!G.started){G.started=true;G.tickAt=nowMs()}
+    return true;
+  };
+  /* 게이지는 프레임이 아니라 "실제 시계"로 닳는다.
+     requestAnimationFrame 은 탭이 숨겨지면 멈춘다 — 프레임에 물려두면
+     탭을 옮겨둔 동안 게이지가 얼어붙어 안 죽는다. 그건 이 게임의 규칙이 아니다. */
+  G.tickAt=0;
+  G.advance=function(now){
+    if(!G.started||G.dead)return;
+    if(!G.tickAt){G.tickAt=now;return}
+    var dt=(now-G.tickAt)/1000;
+    G.tickAt=now;
+    if(dt<=0)return;
+    G.gauge-=G.drain()*dt;
+    if(G.gauge<=0){G.gauge=0;G.die('gauge')}
+  };
+  return G;
+}
+
+/* =========================================================================
+   렌더러 (캔버스 2D)
+   플레이어를 화면 62% 높이에 고정하고 카메라가 따라 오른다.
+   ========================================================================= */
+function makeView(cv,G){
+  var ctx=cv.getContext('2d'), dpr=1, W=0, H=0;
+  var camX=0, camY=0, first=true;
+  var sw=46, sh=34;                    // 칸 간격 (가로/세로)
+
+  function resize(){
+    dpr=Math.min(2,window.devicePixelRatio||1);
+    W=cv.clientWidth; H=cv.clientHeight;
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    var k=Math.min(1.25,Math.max(.78,W/390));
+    sw=46*k; sh=34*k;
+  }
+  window.addEventListener('resize',resize);
+
+  function bg(){
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0d1020'); g.addColorStop(1,'#07080f');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    /* 높이감을 주는 배경 눈금 — 카메라를 따라 흐른다 */
+    ctx.strokeStyle='rgba(38,43,64,.55)'; ctx.lineWidth=1;
+    var span=sh*6, off=((camY*sh)%span+span)%span;
+    for(var y=off;y<H;y+=span){
+      ctx.beginPath(); ctx.moveTo(0,Math.round(y)+.5); ctx.lineTo(W,Math.round(y)+.5); ctx.stroke();
+    }
+  }
+  /* 계단 한 칸. 윗면(밝음) + 앞면(어두움)으로 단차를 만든다.
+     블록 높이를 칸 간격에 맞춰 잘라야 계단이 "계단"으로 읽힌다 —
+     길게 그리면 옆 칸과 겹쳐서 덩어리로 보인다. */
+  function block(x,y){
+    var bw=sw*1.02, topH=Math.max(10,sh*0.38), bodyH=sh-topH+3;
+    var l=Math.round(x-bw/2), w=Math.round(bw);
+    ctx.fillStyle='#161927';                       // 앞면
+    ctx.fillRect(l,y,w,bodyH);
+    ctx.fillStyle='#2c3352';                       // 윗면
+    ctx.fillRect(l,y-topH,w,topH);
+    ctx.fillStyle='rgba(0,229,255,.10)';           // 윗면 앞쪽 하이라이트
+    ctx.fillRect(l,y-2,w,2);
+    ctx.strokeStyle='#3a4166'; ctx.lineWidth=1;
+    ctx.strokeRect(l+.5,Math.round(y-topH)+.5,w-1,Math.round(topH+bodyH)-1);
+  }
+  function hero(x,y,facing,dead){
+    var s=sw*0.42, col=dead?'#5c637d':'#00e5ff';
+    ctx.save();
+    if(!dead&&!REDUCED){ctx.shadowColor='rgba(0,229,255,.5)';ctx.shadowBlur=16}
+    ctx.fillStyle=col;
+    /* 몸 (어깨가 앞쪽으로 조금 나간다 — 방향이 실루엣으로도 읽히게).
+       좌표를 전부 facing 으로 뒤집어야 왼쪽을 볼 때 도형이 꼬이지 않는다. */
+    var f=facing;
+    ctx.beginPath();
+    ctx.moveTo(x-f*s*0.42,y);
+    ctx.lineTo(x-f*s*0.42,y-s*1.35);
+    ctx.lineTo(x+f*s*0.62,y-s*1.35);
+    ctx.lineTo(x+f*s*0.42,y-s*0.2);
+    ctx.lineTo(x+f*s*0.42,y);
+    ctx.closePath(); ctx.fill();
+    /* 머리 — 몸과 확실히 띄운다 */
+    ctx.beginPath(); ctx.arc(x+facing*s*0.1,y-s*2.05,s*0.5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    /* 바라보는 방향 — 머리 앞의 뾰족한 부리. 이걸 봐야 오르기/전환을 고른다 */
+    ctx.fillStyle=col;
+    ctx.beginPath();
+    ctx.moveTo(x+facing*s*0.35,y-s*2.22);
+    ctx.lineTo(x+facing*s*1.15,y-s*2.02);
+    ctx.lineTo(x+facing*s*0.35,y-s*1.86);
+    ctx.closePath(); ctx.fill();
+    /* 눈 */
+    ctx.fillStyle='#04202a';
+    ctx.beginPath(); ctx.arc(x+facing*s*0.28,y-s*2.12,s*0.11,0,Math.PI*2); ctx.fill();
+  }
+
+  return {
+    resize:resize,
+    draw:function(){
+      if(!W||!H)resize();
+      var tx=G.xAt(G.floor), ty=G.floor;
+      if(first){camX=tx;camY=ty;first=false}
+      else{
+        /* 논리 상태는 이미 갱신됐고 그림만 따라온다 — 연타해도 입력이 씹히지 않는다 */
+        var k=REDUCED?1:0.28;
+        camX+=(tx-camX)*k; camY+=(ty-camY)*k;
+      }
+      bg();
+      var baseY=H*0.62, cx=W/2;
+      var lo=Math.max(0,G.floor-8), hi=G.floor+16;
+      for(var i=hi;i>=lo;i--){
+        var sx=cx+(G.xAt(i)-camX)*sw;
+        var sy=baseY-(i-camY)*sh;
+        if(sy<-60||sy>H+60)continue;
+        block(sx,sy);
+      }
+      var hx=cx+(G.xAt(G.floor)-camX)*sw, hy=baseY-(G.floor-camY)*sh;
+      hero(hx,hy,G.facing,G.dead);
+      if(G.dead&&G.why==='wall'){
+        ctx.font='700 '+Math.round(sw*0.62)+'px system-ui,sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('💥',hx+G.wallSide*sw*0.8,hy-sh*0.9);
+      }
+    }
+  };
+}
+
+/* =========================================================================
+   통신 계층 (멀티 전용) — OX 서바이벌의 3중 브로커 폴백을 그대로 가져왔다.
+   공용 브로커는 IP당 연결 제한·주기적 강제 절단이 흔하다. mqtt.js의 reconnectPeriod는
+   "같은 브로커"만 무한 재시도하므로 한 번 거부당하면 영영 못 붙는다. 그래서 절단 후
+   STALL_MS 안에 복귀하지 못하면 현재 클라이언트를 버리고 다음 브로커로 승격한다.
+
+   여기서 오가는 값은 층수와 생존 여부뿐이다. 둘 다 원래 전원에게 공개되는 정보라
+   암호화할 것이 없다 — crypto.subtle 을 쓰지 않으므로 file:// 에서도 동작한다.
+   ========================================================================= */
+var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+var CONNECT_MS=8000, STALL_MS=12000, MAX_ROUNDS=3;
+
+function makeNet(){
+  var cl=null,subs={},bi=0,rounds=0,stallT=null,notify=null,dead=false,pendRes=null,pendRej=null;
+  function setState(x){if(notify)notify(x)}
+  function clearStall(){if(stallT){clearTimeout(stallT);stallT=null}}
+  function armStall(){if(stallT||dead)return;
+    stallT=setTimeout(function(){stallT=null;promote()},STALL_MS)}
+  function promote(){
+    if(dead)return;
+    clearStall();
+    /* 탭이 숨겨져 있으면 브라우저가 타이머를 조여 keepalive가 밀린다.
+       그 상태의 "끊김"은 브로커 탓이 아니므로 갈아타지 말고 다시 지켜본다. */
+    if(document.hidden){armStall();return}
+    var old=cl; cl=null;
+    try{old&&old.end(true)}catch(e){}
+    open();
+  }
+  function giveUp(){
+    setState('dead');
+    if(pendRej){var r=pendRej;pendRes=pendRej=null;r(new Error('broker'))}
+  }
+  function open(){
+    if(dead)return;
+    if(bi>=BROKERS.length){bi=0;rounds++}
+    if(rounds>=MAX_ROUNDS)return giveUp();
+    var url=BROKERS[bi++];
+    var c=window.mqtt.connect(url,{clientId:'st_'+Math.random().toString(16).slice(2,10),
+      clean:true,reconnectPeriod:2500,connectTimeout:7000,keepalive:30});
+    var settled=false;
+    var to=setTimeout(function(){
+      if(settled)return; settled=true;
+      try{c.end(true)}catch(e){} open();
+    },CONNECT_MS);
+    c.on('connect',function(){
+      settled=true;clearTimeout(to);clearStall();
+      cl=c;rounds=0;
+      Object.keys(subs).forEach(function(t){c.subscribe(t,{qos:0})});
+      setState('on');
+      if(pendRes){var r=pendRes;pendRes=pendRej=null;r(url)}
+    });
+    c.on('error',function(){
+      if(settled)return; settled=true;
+      clearTimeout(to);try{c.end(true)}catch(e){} open();
+    });
+    c.on('close',  function(){if(cl===c){setState('off');armStall()}});
+    c.on('offline',function(){if(cl===c){setState('off');armStall()}});
+    c.on('reconnect',function(){if(cl===c){setState('re');armStall()}});
+    c.on('message',function(t,p){
+      if(cl!==c)return;                               // 버린 클라이언트의 잔여 메시지 무시
+      var fn=subs[t]; if(!fn)return;
+      var v=p.toString();
+      try{fn(v?JSON.parse(v):null)}catch(e){}
+    });
+  }
+  return {
+    connect:function(onState){
+      notify=onState;
+      if(cl)return Promise.resolve('');
+      return loadMqtt().then(function(){
+        return new Promise(function(res,rej){
+          pendRes=res;pendRej=rej;bi=0;rounds=0;dead=false;open();
+        });
+      });
+    },
+    rescan:function(){if(!dead&&cl)promote()},
+    sub:function(t,fn){subs[t]=fn;if(cl)cl.subscribe(t,{qos:0})},
+    pub:function(t,o){if(cl)cl.publish(t,JSON.stringify(o),{qos:0})},
+    end:function(){dead=true;clearStall();try{cl&&cl.end(true)}catch(e){}cl=null;subs={}}
+  };
+}
+
+/* =========================================================================
+   전역 상태
+   ========================================================================= */
+var S={
+  screen:'home',
+  mode:'single',
+  pid:rid(8), name:getNick(), code:'', isHost:false,
+  net:null, netState:'idle',
+  peers:{},          // pid -> {n,f,a,seen}
+  roster:null,       // 시작 시점에 확정된 참가자 (방장이 뿌린다)
+  gid:'', seed:0, over:null,
+  hof:{state:'idle', list:null}
+};
+var G=null, V=null, rafId=0, hbT=0, tickT=0;
+
+function tTop(){return 'eknight_stairs5/'+S.code}
+function tP(){return tTop()+'/p'}
+function tEv(){return tTop()+'/ev'}
+/* file:// 에서 location.origin 은 "null" 이라 origin+pathname 으로 만들면 링크가 깨진다.
+   href 에서 해시만 갈아끼우면 http/https/file 어디서나 올바른 주소가 나온다. */
+function inviteLink(){return location.href.split('#')[0]+'#'+S.code}
+
+/* =========================================================================
+   버전 정보 시트
+   OX 서바이벌이 v1.3.3에서 "칩이 화면 밖이라 안 보인다"로 고친 전례가 있다.
+   그래서 칩은 첫 화면 위쪽, 스크롤 없이 보이는 자리에 둔다.
+   ========================================================================= */
+function verChip(){
+  return '<div class="verwrap"><button class="verchip" id="verBtn">버전 <b>v'+VERSION+'</b> · 변경 내역</button></div>';
+}
+function openVer(){
+  var html='<div class="sheet" id="verSheet"><div class="vcard" role="dialog" aria-label="버전 정보">'+
+    '<div class="cardHead"><h2>버전 정보</h2><div class="grow"></div>'+
+    '<button class="ic" id="verClose" aria-label="닫기">✕</button></div>'+
+    '<p class="verNow">현재 버전 <b>v'+VERSION+'</b></p><ol class="verList">'+
+    CHANGELOG.map(function(c){
+      return '<li><h4>v'+esc(c.v)+'</h4><ul>'+c.t.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></li>';
+    }).join('')+'</ol></div></div>';
+  $('#sheet').innerHTML=html;
+  $('#verClose').onclick=closeVer;
+  $('#verSheet').onclick=function(e){if(e.target.id==='verSheet')closeVer()};
+}
+function closeVer(){$('#sheet').innerHTML=''}
+function wireVer(){
+  var b=$('#verBtn'); if(b)b.onclick=openVer;
+}
+
+/* =========================================================================
+   첫 화면
+   ========================================================================= */
+function renderHome(){
+  S.screen='home';
+  var best=bestFloor();
+  $('#app').innerHTML=
+  '<div class="wrap">'+
+    '<div class="topbar">'+
+      '<a class="hublink" href="../../index.html" aria-label="게임 허브로 돌아가기">← 허브</a>'+
+      '<div class="grow"></div>'+
+    '</div>'+
+    verChip()+
+    '<h1>무한의 <span class="em">계단</span></h1>'+
+    '<p class="lead">버튼은 둘뿐이다. 다음 계단이 보는 방향과 같으면 <b>오르기</b>, 반대면 <b>방향 전환</b>.<br>'+
+      '멈추면 체력이 닳는다 — 그대로 서 있으면 죽는다.</p>'+
+    (best?'<div class="card"><div class="cardHead"><h2>🏅 내 최고 기록</h2></div>'+
+      '<div class="big">'+best+'<small>층</small></div></div>':'')+
+    '<button class="mcard" id="mSingle" aria-label="싱글플레이 — 혼자 올라 최고 층수에 도전">'+
+      '<h4>🧍 싱글플레이</h4><p>혼자 오른다. 어디까지 갈 수 있는지.</p></button>'+
+    '<button class="mcard" id="mMulti" aria-label="멀티플레이 — 여럿이 동시에 올라 한 명 남을 때까지">'+
+      '<h4>🌐 멀티플레이</h4><p>2~8인이 같은 계단을 동시에. 한 명 남을 때까지.</p></button>'+
+    '<button class="mcard" id="mHof" aria-label="명예의 전당 — 전체 순위표 보기">'+
+      '<h4>🏆 명예의 전당</h4><p>전체 순위표와 내 기록.</p></button>'+
+  '</div>';
+  wireVer();
+  $('#mSingle').onclick=function(){startSingle()};
+  $('#mMulti').onclick=renderMultiEntry;
+  $('#mHof').onclick=renderHof;
+}
+
+/* =========================================================================
+   명예의 전당 화면
+   ★ 여기가 죽어도 게임은 온전해야 한다. 로딩은 전부 비동기이고,
+     실패해도 "내 기록"은 그대로 뜬다. 게임 시작 경로와 완전히 분리돼 있다.
+   ========================================================================= */
+function recRows(list){
+  return list.map(function(e,i){
+    return '<div class="rec"><span class="rk">'+(i+1)+'</span>'+
+      '<span class="nm">'+esc(e.n)+'</span><span class="fl">'+e.f+'층</span></div>';
+  }).join('');
+}
+
+function hofCardHtml(){
+  var st=S.hof.state;
+  if(st==='loading')return '<div class="empty">불러오는 중…</div>';
+  if(st==='fail')return '<div class="empty">지금은 불러올 수 없어요. (게임에는 영향이 없습니다)</div>';
+  var l=S.hof.list||[];
+  if(!l.length)return '<div class="empty">아직 아무도 오르지 않았습니다. 첫 기록의 주인이 되어보세요.</div>';
+  return recRows(l);
+}
+function loadHof(after){
+  if(S.hof.state==='on')return after&&after();
+  S.hof.state='loading'; after&&after();
+  HOF.load(function(list){
+    S.hof.state=list?'on':'fail';
+    S.hof.list=list;
+    after&&after();
+  });
+}
+function myRecHtml(){
+  var a=myRecords();
+  if(!a.length)return '<div class="empty">아직 기록이 없습니다.</div>';
+  return a.map(function(e,i){
+    return '<div class="rec"><span class="rk">'+(i+1)+'</span>'+
+      '<span class="nm">'+(e.m==='multi'?'🌐 멀티':'🧍 싱글')+'</span>'+
+      '<span class="fl">'+e.f+'층</span></div>';
+  }).join('');
+}
+function renderHof(){
+  S.screen='hof';
+  function paint(){
+    if(S.screen!=='hof')return;
+    $('#app').innerHTML=
+    '<div class="wrap">'+
+      '<div class="topbar"><button class="hublink" id="back" aria-label="첫 화면으로 돌아가기">← 뒤로</button>'+
+      '<div class="grow"></div></div>'+
+      verChip()+
+      '<h1>🏆 명예의 전당</h1>'+
+      '<div class="card"><div class="cardHead"><h2>전체 순위표</h2></div>'+
+        hofCardHtml()+
+        '<p class="tiny">전체 순위표는 공용 게시판에 얹어 둔 것이라 <b>기록이 사라질 수 있고 검증되지 않습니다.</b> '+
+        '아래 내 기록은 이 기기에 저장되므로 영향을 받지 않습니다.</p>'+
+      '</div>'+
+      '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
+    '</div>';
+    wireVer();
+    $('#back').onclick=renderHome;
+  }
+  paint();
+  loadHof(paint);
+}
+
+/* =========================================================================
+   플레이 화면 (싱글·멀티 공용)
+   ========================================================================= */
+function playHtml(multi){
+  return '<div class="play">'+
+    '<div class="hud">'+
+      '<div class="fl"><span id="fNum">0</span><small>층</small></div>'+
+      '<div class="gwrap"><div class="gbar" id="gBar"><i id="gFill"></i></div>'+
+      '<span class="gpct" id="gPct">100%</span></div>'+
+    '</div>'+
+    '<button class="exit" id="exitBtn" aria-label="게임 나가기">✕</button>'+
+    '<canvas id="cv"></canvas>'+
+    (multi?'<div class="board" id="board"></div>':'')+
+    '<div class="spacer"></div>'+
+    '<div class="pads">'+
+      '<button class="pad" id="padTurn" aria-label="방향 전환 — 돌면서 한 칸 오른다">방향 전환<small>돌면서 한 칸</small></button>'+
+      '<button class="pad" id="padUp" aria-label="오르기 — 보는 방향 그대로 한 칸 오른다">오르기<small>그대로 한 칸</small></button>'+
+    '</div>'+
+  '</div>';
+}
+function wirePads(onAct,onExit){
+  function bind(el,act){
+    if(!el)return;
+    el.addEventListener('pointerdown',function(e){e.preventDefault();onAct(act)},{passive:false});
+    el.addEventListener('contextmenu',function(e){e.preventDefault()});
+  }
+  bind($('#padUp'),'up');
+  bind($('#padTurn'),'turn');
+  $('#exitBtn').onclick=onExit;
+  document.onkeydown=function(e){
+    if(e.repeat)return;
+    var k=e.key.toLowerCase();
+    if(k==='z'||k==='arrowup'){e.preventDefault();onAct('up')}
+    else if(k==='x'||k==='arrowleft'||k==='arrowright'){e.preventDefault();onAct('turn')}
+  };
+}
+function unwirePads(){document.onkeydown=null}
+
+function paintHud(){
+  var f=$('#fNum'); if(!f)return;
+  f.textContent=G.floor;
+  var pct=Math.max(0,Math.round(G.gauge));
+  var fill=$('#gFill'); if(fill)fill.style.width=pct+'%';
+  var bar=$('#gBar'); if(bar){
+    if(pct<=30)bar.classList.add('low'); else bar.classList.remove('low');
+  }
+  var p=$('#gPct'); if(p)p.textContent=pct+'%';
+}
+function stopLoop(){if(rafId){cancelAnimationFrame(rafId);rafId=0}}
+function startLoop(onFrame){
+  stopLoop();
+  (function frame(){
+    rafId=requestAnimationFrame(frame);
+    onFrame();
+  })();
+}
+
+/* =========================================================================
+   싱글플레이
+   ★ 플레이 중에는 네트워크를 전혀 건드리지 않는다. 명예의 전당은 죽은 뒤에만 부른다.
+   ========================================================================= */
+function startSingle(){
+  S.screen='single'; S.mode='single';
+  G=makeGame((Math.random()*4294967296)>>>0);
+  $('#app').innerHTML=playHtml(false);
+  V=makeView($('#cv'),G); V.resize();
+  wirePads(function(a){
+    if(G.dead)return;
+    G.act(a);
+    if(G.dead)setTimeout(endSingle,650);
+  },function(){ quitPlay(renderHome) });
+  startLoop(function(){
+    G.advance(nowMs());
+    V.draw(); paintHud();
+    if(G.dead&&!G._ended){G._ended=1;setTimeout(endSingle,650)}
+  });
+  /* 탭이 숨겨져 RAF가 멈춰도 게이지는 계속 닳아야 한다 */
+  clearInterval(tickT);
+  tickT=setInterval(function(){
+    if(S.screen!=='single'||!G)return;
+    G.advance(nowMs());
+    if(G.dead&&!G._ended){G._ended=1;setTimeout(endSingle,650)}
+  },500);
+}
+function quitPlay(then){
+  stopLoop(); unwirePads(); clearInterval(tickT); tickT=0; G=null; V=null; then();
+}
+function endSingle(){
+  if(S.screen!=='single')return;
+  var floor=G.floor, why=G.why;
+  stopLoop(); unwirePads(); clearInterval(tickT); tickT=0;
+  addRecord(floor,'single');
+  S.screen='over';
+  var submitted=false;
+  var best=bestFloor();
+  function paint(){
+    if(S.screen!=='over')return;
+    var canSubmit=(!submitted&&S.hof.state==='on'&&HOF.qualifies(floor));
+    $('#app').innerHTML=
+    '<div class="wrap">'+
+      '<div class="topbar"><button class="hublink" id="home" aria-label="첫 화면으로 돌아가기">← 첫 화면</button>'+
+        '<div class="grow"></div></div>'+
+      verChip()+
+      '<h1>'+(why==='wall'?'벽에 부딪혔다 💥':'힘이 다했다 🫠')+'</h1>'+
+      '<div class="card"><div class="cardHead"><h2>이번 기록</h2></div>'+
+        '<div class="big">'+floor+'<small>층</small></div>'+
+        '<p class="tiny">최고 기록 '+best+'층'+(floor>=best&&floor>0?' — <b style="color:var(--gold)">신기록!</b>':'')+'</p>'+
+      '</div>'+
+      '<div class="row"><button class="btn" id="again">다시 도전</button>'+
+        '<button class="btn ghost" id="home2">첫 화면</button></div>'+
+      '<div class="card"><div class="cardHead"><h2>🏆 명예의 전당</h2></div>'+
+        hofCardHtml()+
+        (canSubmit?'<div style="margin-top:12px">'+
+          '<label class="lbl" for="hofNick">이름 (최대 8자)</label>'+
+          '<input type="text" id="hofNick" maxlength="8" value="'+esc(S.name)+'" placeholder="이름">'+
+          '<div style="height:10px"></div>'+
+          '<button class="btn" id="hofGo">🏆 명예의 전당에 등록</button></div>':'')+
+        '<p class="tiny">전체 순위표는 공용 게시판에 얹어 둔 것이라 <b>기록이 사라질 수 있고 검증되지 않습니다.</b> '+
+        '위의 이번 기록과 내 기록은 이 기기에 저장되므로 영향을 받지 않습니다.</p>'+
+      '</div>'+
+      '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
+    '</div>';
+    wireVer();
+    $('#home').onclick=renderHome; $('#home2').onclick=renderHome;
+    $('#again').onclick=function(){startSingle()};
+    var go=$('#hofGo');
+    if(go)go.onclick=function(){
+      var nm=cleanName($('#hofNick').value);
+      setNick(nm); S.name=nm;
+      go.disabled=true; go.textContent='등록 중…';
+      HOF.submit(nm,floor,function(ok){
+        if(ok){submitted=true;S.hof.list=null;S.hof.state='loading';
+          HOF.load(function(l){S.hof.state=l?'on':'fail';S.hof.list=l;paint();});
+          toast('명예의 전당에 등록했습니다');
+        }else{toast('등록하지 못했습니다');go.disabled=false;go.textContent='🏆 명예의 전당에 등록'}
+      });
+    };
+  }
+  paint();
+  loadHof(paint);        // 죽은 뒤 비동기로 채운다 — 실패해도 위쪽 기록은 그대로다
+}
+
+/* =========================================================================
+   멀티플레이 — 방 만들기 / 입장
+   ========================================================================= */
+function renderMultiEntry(){
+  S.screen='multi';
+  var pre=(location.hash||'').replace('#','').toUpperCase().slice(0,5);
+  $('#app').innerHTML=
+  '<div class="wrap">'+
+    '<div class="topbar"><button class="hublink" id="back" aria-label="첫 화면으로 돌아가기">← 뒤로</button>'+
+      '<div class="grow"></div></div>'+
+    verChip()+
+    '<h1>🌐 멀티플레이</h1>'+
+    '<p class="lead">2~8인이 <b>완전히 같은 계단</b>을 동시에 오른다. 한 명 남을 때까지, 층수 제한 없이.</p>'+
+    '<div class="card">'+
+      '<label class="lbl" for="nm">내 이름 (최대 8자)</label>'+
+      '<input type="text" id="nm" maxlength="8" value="'+esc(S.name)+'" placeholder="이름">'+
+      '<div style="height:12px"></div>'+
+      '<button class="btn" id="create">방 만들기</button>'+
+    '</div>'+
+    '<div class="card">'+
+      '<label class="lbl" for="cd">방 코드로 입장</label>'+
+      '<input type="text" id="cd" maxlength="5" value="'+esc(pre)+'" placeholder="예: K7QM2" '+
+        'autocapitalize="characters" autocomplete="off">'+
+      '<div style="height:12px"></div>'+
+      '<button class="btn ghost" id="join">입장하기</button>'+
+    '</div>'+
+    '<p class="tiny">친구끼리 하는 방을 전제로 만들었습니다. 층수는 각자의 브라우저가 보고하는 값이라 검증되지 않고, '+
+    '<b>모두 같은 계단</b>이라 먼저 탈락한 사람이 옆에서 다음 계단을 알려주면 그대로 통합니다. '+
+    '관전 화면에는 남의 계단을 그리지 않지만, 그것만으로 다 막지는 못합니다.</p>'+
+  '</div>';
+  wireVer();
+  $('#back').onclick=renderHome;
+  $('#create').onclick=function(){
+    S.name=cleanName($('#nm').value); setNick(S.name);
+    enterRoom(rid(5),true);
+  };
+  $('#join').onclick=function(){
+    S.name=cleanName($('#nm').value); setNick(S.name);
+    var c=String($('#cd').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+    if(c.length<5)return toast('방 코드 5자를 입력하세요');
+    enterRoom(c,false);
+  };
+}
+
+/* =========================================================================
+   멀티 — 대기실
+   방장 권한은 대기실과 시작 신호까지만이다. 시작한 뒤에는 각자의 죽음을 본인만
+   보고하고 다툴 여지가 없으므로, 모든 클라이언트가 같은 상태에서 승자를 독립적으로
+   계산할 수 있다 — 그래서 방장이 나가도 경기는 끝나지 않는다.
+   ========================================================================= */
+function netLabel(){
+  var m={idle:'연결 중…',on:'연결됨',off:'끊김 — 복구 중',re:'재연결 중…',dead:'연결 실패'};
+  return m[S.netState]||'…';
+}
+function enterRoom(code,isHost){
+  S.code=code; S.isHost=isHost; S.peers={}; S.roster=null; S.gid=''; S.over=null;
+  S.screen='room'; S.hostSeen=0; S.hostPs=null; S.scans=0;
+  location.hash=code;
+  renderRoom();
+  if(!S.net)S.net=makeNet();
+  S.net.connect(function(st){S.netState=st;paintRoomState()}).then(function(){
+    S.netState='on';
+    S.net.sub(tP(),onMsg);
+    pumpLobby();
+    paintRoomState();
+  })['catch'](function(){
+    S.netState='dead'; paintRoomState();
+  });
+}
+function leaveRoom(){
+  if(S.net){try{S.net.pub(tP(),{t:'bye',pid:S.pid})}catch(e){}
+    S.net.end(); S.net=null}
+  clearInterval(hbT); hbT=0;
+  clearInterval(tickT); tickT=0;
+  stopLoop(); unwirePads();
+  S.code=''; S.peers={}; S.roster=null; S.over=null; G=null; V=null;
+  try{location.hash=''}catch(e){}
+}
+function pumpLobby(){
+  clearInterval(hbT);
+  hbT=setInterval(function(){
+    if(!S.net)return;
+    if(S.screen==='room'){
+      S.net.pub(tP(),{t:'hi',pid:S.pid,n:S.name});
+      if(S.isHost)S.net.pub(tP(),{t:'room',host:S.pid,ps:lobbyList()});
+      /* 방장을 못 찾으면 다른 브로커에 방이 있을 수 있다 — OX와 같은 훑기 */
+      if(!S.isHost&&!S.hostPs&&nowMs()-(S.enteredAt||0)>6000&&S.scans<3){
+        S.scans++; S.enteredAt=nowMs(); S.net.rescan(); paintRoomState();
+      }
+      paintRoomList();
+    }
+  },1200);
+  S.enteredAt=nowMs();
+  if(S.net){
+    S.net.pub(tP(),{t:'hi',pid:S.pid,n:S.name});
+    if(S.isHost)S.net.pub(tP(),{t:'room',host:S.pid,ps:lobbyList()});
+  }
+}
+function lobbyList(){
+  var out=[{pid:S.pid,n:S.name}], t=nowMs();
+  Object.keys(S.peers).forEach(function(k){
+    var p=S.peers[k];
+    if(k!==S.pid&&t-p.seen<5000&&out.length<8)out.push({pid:k,n:p.n});
+  });
+  return out;
+}
+function roomPlayers(){
+  if(S.isHost)return lobbyList();
+  return S.hostPs||[{pid:S.pid,n:S.name}];
+}
+function renderRoom(){
+  S.screen='room';
+  var res=S.over?resultHtml():'';
+  $('#app').innerHTML=
+  '<div class="wrap">'+
+    '<div class="topbar"><button class="hublink" id="out" aria-label="방에서 나가기">← 나가기</button>'+
+      '<div class="grow"></div><span class="st" id="netSt">·</span></div>'+
+    verChip()+
+    res+
+    '<h1>대기실</h1>'+
+    '<div class="card"><div class="cardHead"><h2>방 코드</h2></div>'+
+      '<div class="code">'+esc(S.code)+'</div>'+
+      '<button class="btn ghost" id="copy">초대 링크 복사</button>'+
+      '<ul class="plist" id="plist"></ul>'+
+    '</div>'+
+    (S.isHost?
+      '<button class="btn" id="start">시작하기</button>'+
+      '<p class="tiny">2명 이상 모이면 시작할 수 있습니다.</p>'
+      :'<p class="tiny">방장이 시작하기를 누르면 함께 출발합니다.</p>')+
+  '</div>';
+  wireVer();
+  $('#out').onclick=function(){leaveRoom();renderHome()};
+  $('#copy').onclick=function(){
+    var l=inviteLink();
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(l).then(function(){toast('초대 링크를 복사했습니다')},
+        function(){toast(l)});
+    }else toast(l);
+  };
+  var sb=$('#start');
+  if(sb)sb.onclick=hostStart;
+  paintRoomState(); paintRoomList();
+}
+function paintRoomState(){
+  var el=$('#netSt'); if(!el)return;
+  el.className='st'+(S.netState==='on'?'':' off');
+  el.innerHTML='<b>●</b> '+esc(netLabel())+
+    (!S.isHost&&!S.hostPs&&S.netState==='on'?' · 방 찾는 중':'');
+}
+function paintRoomList(){
+  var ul=$('#plist'); if(!ul)return;
+  var ps=roomPlayers(), host=S.isHost?S.pid:(S.hostPid||'');
+  ul.innerHTML=ps.map(function(p){
+    return '<li>'+esc(p.n)+(p.pid===host?' <span class="host">방장</span>':'')+
+      (p.pid===S.pid?' <span class="pill">나</span>':'')+'</li>';
+  }).join('');
+  var sb=$('#start');
+  if(sb)sb.disabled=(ps.length<2);
+}
+function hostStart(){
+  var ps=lobbyList();
+  if(ps.length<2)return toast('2명 이상 있어야 시작합니다');
+  var gid=rid(6), seed=(Math.random()*4294967296)>>>0;
+  var msg={t:'go',gid:gid,seed:seed,ps:ps};
+  /* 공용 브로커에서 한 번은 흘릴 수 있다 — 짧게 세 번 보낸다 (gid로 중복 무시) */
+  S.net.pub(tP(),msg);
+  setTimeout(function(){S.net&&S.net.pub(tP(),msg)},250);
+  setTimeout(function(){S.net&&S.net.pub(tP(),msg)},550);
+  beginMulti(msg);
+}
+
+/* ---------- 메시지 수신 ---------- */
+function onMsg(m){
+  if(!m||!m.t)return;
+  var t=nowMs();
+  if(m.t==='hi'){
+    if(m.pid===S.pid)return;
+    var p=S.peers[m.pid]||(S.peers[m.pid]={n:'',f:0,a:1,seen:0});
+    p.n=cleanName(m.n); p.seen=t;
+    return;
+  }
+  if(m.t==='room'){
+    if(m.host===S.pid)return;
+    S.hostPid=m.host; S.hostPs=(m.ps||[]).slice(0,8); S.hostSeen=t;
+    if(S.screen==='room'){paintRoomList();paintRoomState()}
+    return;
+  }
+  if(m.t==='go'){
+    if(m.gid===S.gid)return;                 // 같은 판의 재전송
+    if(S.screen!=='room')return;             // 이미 경기 중이면 무시
+    var mine=(m.ps||[]).some(function(p){return p.pid===S.pid});
+    if(!mine)return;                         // 내가 낀 판이 아니다
+    beginMulti(m);
+    return;
+  }
+  if(m.t==='s'){
+    if(m.pid===S.pid)return;
+    var q=S.peers[m.pid]||(S.peers[m.pid]={n:'',f:0,a:1,seen:0});
+    q.n=cleanName(m.n||q.n);
+    if(typeof m.f==='number'&&m.f>q.f)q.f=Math.floor(m.f);
+    if(m.a===0)q.a=0;
+    q.seen=t;
+    return;
+  }
+  if(m.t==='bye'){
+    var b=S.peers[m.pid];
+    if(b){b.a=0;b.seen=t-99999}
+    if(S.screen==='room')paintRoomList();
+    return;
+  }
+}
+
+/* =========================================================================
+   멀티 — 경기
+   ========================================================================= */
+var PUB_MS=400;        // 층수 발행 주기. 순위표가 1초여도 게임은 성립하지만,
+                       // "지금 누가 몇 층인지"의 긴박감이 이 게임의 재미라 너무 늦추지 않는다.
+var GONE_MS=6000;      // 이만큼 소식이 없으면 이탈로 보고 탈락 처리한다
+
+function beginMulti(msg){
+  S.gid=msg.gid; S.seed=msg.seed>>>0; S.roster=(msg.ps||[]).slice(0,8); S.over=null;
+  S.mode='multi'; S.screen='play';
+  var t=nowMs();
+  S.peers={}; S.deadSeq={}; S.deadN=0;
+  S.roster.forEach(function(p){
+    if(p.pid!==S.pid)S.peers[p.pid]={n:cleanName(p.n),f:0,a:1,seen:t};
+  });
+  G=makeGame(S.seed);
+  $('#app').innerHTML=playHtml(true)+'<div class="count" id="cnt">3</div>';
+  V=makeView($('#cv'),G); V.resize();
+  paintHud(); paintBoard(); V.draw();
+  wirePads(function(a){
+    if(!S.running||G.dead)return;
+    G.act(a);
+    if(G.dead)onMyDeath();
+  },function(){ leaveRoom(); renderHome() });
+
+  S.running=false;
+  var n=3;
+  var cd=setInterval(function(){
+    n--;
+    var el=$('#cnt');
+    if(!el){clearInterval(cd);return}
+    if(n>0)el.textContent=String(n);
+    else{
+      clearInterval(cd);
+      el.parentNode.removeChild(el);
+      runMulti();
+    }
+  },800);
+}
+function onMyDeath(){
+  /* 죽는 순간에는 즉시 알린다 — 순위표가 400ms 늦게 갱신되면 억울하다 */
+  pubState(); setTimeout(pubState,180);
+  var pads=document.querySelector('.pads');
+  if(pads)pads.innerHTML='<div class="pad" style="display:flex;align-items:center;justify-content:center;opacity:.75">'+
+    '관전 중 · 내 기록 <b style="color:var(--accent);margin:0 4px">'+G.floor+'층</b></div>';
+  unwirePads();
+  var ex=$('#exitBtn'); if(ex)ex.onclick=function(){leaveRoom();renderHome()};
+}
+function pubState(){
+  if(!S.net||!G)return;
+  S.net.pub(tP(),{t:'s',pid:S.pid,n:S.name,f:G.floor,a:G.dead?0:1});
+}
+/* 누가 먼저 떨어졌는지 기록해 둔다. 이게 없으면 결과 화면이
+   "4층이 1등, 20층이 2등"으로 보여 규칙을 오해하게 된다. */
+function markDead(pid){
+  if(!S.deadSeq)S.deadSeq={};
+  if(!S.deadSeq[pid])S.deadSeq[pid]=(++S.deadN||(S.deadN=1));
+}
+function multiStates(){
+  var t=nowMs(), out=[];
+  if(!S.deadSeq){S.deadSeq={};S.deadN=0}
+  (S.roster||[]).forEach(function(p){
+    if(p.pid===S.pid){
+      var al=!!(G&&!G.dead);
+      if(!al)markDead(S.pid);
+      out.push({pid:S.pid,n:S.name,f:G?G.floor:0,alive:al,me:true});
+    }else{
+      var q=S.peers[p.pid];
+      if(!q)q={n:cleanName(p.n),f:0,a:1,seen:t};
+      var gone=(t-q.seen)>GONE_MS;
+      var al2=!!q.a&&!gone;
+      if(!al2)markDead(p.pid);
+      out.push({pid:p.pid,n:q.n||cleanName(p.n),f:q.f,alive:al2,me:false,gone:gone&&!!q.a});
+    }
+  });
+  out.sort(function(a,b){
+    if(a.alive!==b.alive)return a.alive?-1:1;      // 살아 있는 사람이 위
+    if(a.alive)return b.f-a.f;                      // 생존자끼리는 높이 순
+    var da=S.deadSeq[a.pid]||0, db=S.deadSeq[b.pid]||0;
+    return db-da;                                   // 늦게 떨어진 사람이 위
+  });
+  return out;
+}
+function paintBoard(){
+  var el=$('#board'); if(!el)return;
+  var st=multiStates(), alive=0;
+  st.forEach(function(x){if(x.alive)alive++});
+  el.innerHTML='<h5>생존 '+alive+' / '+st.length+'</h5>'+
+    st.map(function(x){
+      return '<div class="b'+(x.alive?'':' dead')+(x.me?' me':'')+'">'+
+        '<span class="n">'+esc(x.n)+'</span><span class="f">'+x.f+'</span></div>';
+    }).join('');
+}
+function runMulti(){
+  S.running=true;
+  clearInterval(tickT);
+  tickT=setInterval(function(){
+    if(S.screen!=='play')return;
+    G.advance(nowMs());
+    if(G.dead&&!G._ended){G._ended=1;onMyDeath()}
+    pubState();
+    paintBoard();
+    checkEnd();
+  },PUB_MS);
+  startLoop(function(){
+    G.advance(nowMs());
+    if(G.dead&&!G._ended){G._ended=1;onMyDeath()}
+    V.draw(); paintHud();
+  });
+}
+function checkEnd(){
+  if(S.screen!=='play')return;
+  var st=multiStates(), alive=st.filter(function(x){return x.alive});
+  if(alive.length>1)return;
+  finishMulti(st,alive);
+}
+function finishMulti(st,alive){
+  S.running=false;
+  clearInterval(tickT); tickT=0;
+  stopLoop(); unwirePads();
+  pubState();
+  var winners;
+  if(alive.length===1)winners=[alive[0]];
+  else{
+    /* 동시 탈락 — 최종 층수가 높은 쪽이 우승, 층수까지 같으면 공동 우승 */
+    var top=0;
+    st.forEach(function(x){if(x.f>top)top=x.f});
+    winners=st.filter(function(x){return x.f===top});
+  }
+  if(G)addRecord(G.floor,'multi');
+  S.over={
+    st:st.slice(),
+    winners:winners.map(function(w){return {n:w.n,f:w.f,me:w.me}}),
+    myFloor:G?G.floor:0
+  };
+  S.screen='mover';
+  renderMultiOver();
+}
+function resultHtml(){
+  if(!S.over)return '';
+  var o=S.over;
+  var iWon=o.winners.some(function(w){return w.me});
+  return '<div class="card">'+
+    '<div class="cardHead"><h2>'+(iWon?'🏆 우승했습니다':'경기 결과')+'</h2></div>'+
+    '<p class="lead" style="margin:0 0 8px">'+
+      (o.winners.length>1?'공동 우승 — ':'우승 — ')+
+      esc(o.winners.map(function(w){return w.n}).join(', '))+
+      ' <span class="pill">'+o.winners[0].f+'층</span></p>'+
+    '<p class="tiny" style="margin:0 0 8px">순위는 <b>오래 버틴 순</b>입니다 — 층수 순이 아닙니다. '+
+    '더 높이 올라갔어도 먼저 떨어지면 아래에 놓입니다.</p>'+
+    o.st.map(function(x,i){
+      return '<div class="rec'+(x.me?' me':'')+'"><span class="rk">'+(i+1)+'</span>'+
+        '<span class="nm">'+esc(x.n)+(x.me?' (나)':'')+
+          (x.alive?' <span class="pill">생존</span>':'')+'</span>'+
+        '<span class="fl">'+x.f+'층</span></div>';
+    }).join('')+
+  '</div>';
+}
+function renderMultiOver(){
+  $('#app').innerHTML=
+  '<div class="wrap">'+
+    '<div class="topbar"><button class="hublink" id="out" aria-label="첫 화면으로 돌아가기">← 첫 화면</button>'+
+      '<div class="grow"></div><span class="st" id="netSt">·</span></div>'+
+    verChip()+
+    '<h1>경기 종료</h1>'+
+    resultHtml()+
+    '<div class="row"><button class="btn" id="lobby">대기실로</button>'+
+      '<button class="btn ghost" id="out2">첫 화면</button></div>'+
+    '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
+  '</div>';
+  wireVer();
+  paintRoomState();
+  $('#out').onclick=function(){leaveRoom();renderHome()};
+  $('#out2').onclick=function(){leaveRoom();renderHome()};
+  $('#lobby').onclick=function(){
+    S.gid=''; G=null; V=null;
+    renderRoom(); pumpLobby();
+  };
+}
+
+/* =========================================================================
+   부팅
+   ========================================================================= */
+window.addEventListener('hashchange',function(){});
+/* 탭을 떠난 동안에도 게이지는 실제 시계로 닳는다 (G.advance).
+   돌아왔을 때 이미 죽어 있으면 그대로 결과로 넘어간다 — 멈추면 죽는다. */
+renderHome();
+</script>
+</body>
+</html>
