@@ -76,7 +76,7 @@ window.GAMES = [
     title: "오목",
     desc: "방 코드 하나로 친구와 단둘이. 금수까지 지키는 정통 렌주룰 오목.",
     path: "games/duel/index.html",
-    emoji: "⚪",
+    emoji: "⚫",
     color: ["#d4a373", "#3b2412"],
     tags: ["보드", "1:1", "멀티"],
     status: "ready",
