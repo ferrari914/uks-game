@@ -51,6 +51,12 @@
   .btn-gold{background:var(--gold)}.btn-o{background:var(--o)}
   .btn-ghost{background:transparent;color:var(--paper);border:1px solid var(--line)}
   .note{font-size:11.5px;color:var(--mute);line-height:1.65;margin-top:14px}
+  .verchip{display:inline-flex;align-items:center;gap:6px;background:#0D0B14;border:1px solid var(--line);
+    color:var(--mute);border-radius:99px;padding:7px 15px;font-family:var(--body);font-size:12px;
+    letter-spacing:.04em;cursor:pointer;transition:border-color .15s}
+  .verchip:active{transform:translateY(1px)}
+  .verchip b{color:var(--gold);font-weight:700}
+  .verwrap{text-align:center;margin-top:16px}
   .err{color:var(--x);font-size:13px;margin-top:10px;min-height:18px}
   .conn{position:fixed;top:0;left:0;right:0;text-align:center;font-size:11.5px;padding:6px;
     background:#2A1520;color:var(--x);z-index:99;letter-spacing:.04em;display:none}
@@ -466,7 +472,8 @@ function renderHome(){
   app.innerHTML=
   '<div class="hero"><div class="kicker">실시간 온라인 서바이벌</div>'+
   '<h1 class="logo"><span class="o">O</span><span class="x">X</span><span class="sub">서바이벌</span></h1>'+
-  '<p class="tag">문제가 나오면 O 또는 X 발판으로 이동하세요.<br>틀린 쪽 발판은 무너집니다. 마지막 한 명이 우승.</p></div>'+
+  '<p class="tag">문제가 나오면 O 또는 X 발판으로 이동하세요.<br>틀린 쪽 발판은 무너집니다. 마지막 한 명이 우승.</p>'+
+  '<div class="verwrap"><button class="verchip">버전 <b>v'+VERSION+'</b> · 변경 내역</button></div></div>'+
   '<div class="card"><label class="lbl" for="nm">이름</label>'+
   '<input type="text" id="nm" maxlength="8" placeholder="8자까지" value="'+esc(S.name)+'">'+
   '<label class="lbl" style="margin-top:14px">캐릭터</label><div class="emoji-grid" id="eg">'+
@@ -482,8 +489,7 @@ function renderHome(){
   'style="text-transform:uppercase;flex:1.2" value="'+esc(pre)+'">'+
   '<button class="btn btn-o" id="jn" style="flex:1">입장</button></div>'+
   '<div class="err" id="er">'+esc(S.err)+'</div>'+
-  '<p class="note">공용 메시지 브로커를 통해 같은 방 참가자끼리 연결됩니다. 이름·캐릭터·선택은 같은 방 사람들에게 보이니 민감한 내용은 넣지 마세요.</p></div>'+
-  '<button class="btn btn-ghost" id="verBtn" style="width:100%;margin-top:12px;font-size:13px;padding:12px">버전 v'+VERSION+'</button>';
+  '<p class="note">공용 메시지 브로커를 통해 같은 방 참가자끼리 연결됩니다. 이름·캐릭터·선택은 같은 방 사람들에게 보이니 민감한 내용은 넣지 마세요.</p></div>';
 
   document.getElementById('eg').onclick=function(e){
     var b=e.target.closest('button');if(!b)return;S.emojiIdx=+b.dataset.i;
@@ -494,7 +500,6 @@ function renderHome(){
   document.getElementById('jn').onclick=joinRoom;
   if(document.getElementById('jn2'))document.getElementById('jn2').onclick=joinRoom;
   document.getElementById('cd').onkeydown=function(e){if(e.key==='Enter')joinRoom()};
-  document.getElementById('verBtn').onclick=openVer;
 }
 function fail(m){S.err=m;var e=document.getElementById('er');if(e)e.textContent=m}
 function setNet(s){
@@ -783,8 +788,10 @@ function closeChat(){
 function toggleChat(){S.chatOpen?closeChat():openChat()}
 
 /* ================= 버전 정보 ================= */
-var VERSION='1.3.2';
+var VERSION='1.3.3';
 var CHANGELOG=[
+ {v:'1.3.3',t:['버전 정보 버튼이 화면 밖에 있어 잘 보이지 않던 문제 수정 — 첫 화면 위쪽으로 이동',
+               '대기실과 결과 화면에서도 버전 정보를 볼 수 있게 추가']},
  {v:'1.3.2',t:['내부 정리 — 화면을 다시 그리는 횟수와 낭비되는 타이머를 줄여 더 가볍게 동작합니다']},
  {v:'1.3.1',t:['연결이 한 번 끊기면 영영 복구되지 않던 문제 수정 — 되돌아오지 못하면 다른 브로커로 자동 전환',
                '방장 인터넷이 잠깐 끊겼을 때 참가자가 전원 튕겨나가 방이 해체되던 문제 수정',
@@ -855,6 +862,8 @@ function render(){
   else if(S.screen==='lobby')renderLobby();
   else if(S.screen==='game')renderGame();
   else if(S.screen==='over')renderOver();
+  var vs=document.querySelectorAll('.verchip');
+  for(var i=0;i<vs.length;i++)vs[i].onclick=openVer;
   paintChat();
 }
 
@@ -870,7 +879,8 @@ function renderLobby(){
   '<div class="chatin"><input type="text" id="cmsg" maxlength="80" placeholder="메시지 (80자까지)" autocomplete="off">'+
   '<button class="btn btn-o" id="csend">전송</button></div></div>'+
   '<button class="btn btn-ghost" id="lv" style="width:100%;margin-top:12px;font-size:14px">방 나가기</button>'+
-  '<p class="note">방장이 나가면 방이 닫힙니다. 게임 도중 들어온 사람은 관전하다가 다음 판부터 참가합니다.</p>';
+  '<p class="note">방장이 나가면 방이 닫힙니다. 게임 도중 들어온 사람은 관전하다가 다음 판부터 참가합니다.</p>'+
+  '<div class="verwrap"><button class="verchip">버전 <b>v'+VERSION+'</b> · 변경 내역</button></div>';
   document.getElementById('lv').onclick=leaveRoom;
   document.getElementById('cp').onclick=function(e){copy(inviteLink(),e.target,'초대 링크 복사')};
   document.getElementById('cp2').onclick=function(e){copy(S.code,e.target,'코드만 복사')};
@@ -1222,7 +1232,8 @@ function renderOver(){
    '<div class="row" style="margin-top:16px">'+
    (S.isHost?'<button class="btn btn-gold" id="again">한 판 더</button>':'')+
    '<button class="btn btn-ghost" id="lv2">방 나가기</button></div>'+
-   (S.isHost?'':'<p class="note">방장이 다시 시작할 때까지 기다려 주세요.</p>');
+   (S.isHost?'':'<p class="note">방장이 다시 시작할 때까지 기다려 주세요.</p>')+
+   '<div class="verwrap"><button class="verchip">버전 <b>v'+VERSION+'</b> · 변경 내역</button></div>';
   document.getElementById('lv2').onclick=leaveRoom;
   var a=document.getElementById('again');
   if(a)a.onclick=function(){chEls={};S.overKey=null;S.fxRd=null;
@@ -1239,7 +1250,7 @@ document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&S.code)NET.pub(tEv(),{t:'hb',pid:S.pid,name:S.name,em:S.emojiIdx});
 });
 
-renderHome();
+render();                       // renderHome이 아니라 render를 거쳐야 버전 칩까지 배선된다
 window.__OXREADY__=true;
 })();
 </script>
