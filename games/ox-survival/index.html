@@ -347,6 +347,9 @@ var TIMEOUT_DEATHS=['고민만 하다 시간이 다 갔다 ⏳','그대로 얼�
 /* ================= 통신 계층 ================= */
 var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
 var MQTT_CDN=['https://unpkg.com/mqtt@5.14.1/dist/mqtt.min.js','https://cdn.jsdelivr.net/npm/mqtt@5.14.1/dist/mqtt.min.js'];
+var CONNECT_MS=8000;   // 한 브로커에 붙어보는 시간
+var STALL_MS=12000;    // 붙어 있다가 끊긴 뒤 이만큼 안 돌아오면 다음 브로커로 승격
+var MAX_ROUNDS=3;      // 브로커 목록을 이만큼 돌고도 실패하면 포기
 
 function loadMqtt(){
   return new Promise(function(res,rej){
@@ -360,38 +363,83 @@ function loadMqtt(){
     })();
   });
 }
+/* 공용 브로커는 IP당 연결 제한·주기적 강제 절단이 흔하다. mqtt.js의 reconnectPeriod는
+   "같은 브로커"만 무한 재시도하므로, 한 번 거부당하면 영영 못 붙는다.
+   그래서 절단 후 STALL_MS 안에 복귀하지 못하면 현재 클라이언트를 버리고 다음 브로커로
+   승격한다. connect 핸들러가 구독을 전부 복원하므로 최초 연결과 같은 경로를 재사용한다. */
 function makeMqttNet(){
-  var cl=null,subs={},bi=0;
+  var cl=null,subs={},bi=0,rounds=0,stallT=null,notify=null,dead=false;
+  var pendRes=null,pendRej=null;
+
+  function setState(x){ if(notify)notify(x) }
+  function clearStall(){ if(stallT){clearTimeout(stallT);stallT=null} }
+  function armStall(){ if(stallT||dead)return;            // 재무장 금지 — reconnect가 2.5초마다 떠서 기한이 밀린다
+    stallT=setTimeout(function(){stallT=null;promote()},STALL_MS); }
+  function promote(){                                     // 지금 브로커를 포기하고 다음으로
+    if(dead)return;
+    clearStall();
+    // 탭이 숨겨져 있으면 브라우저가 타이머를 조여 keepalive가 밀린다.
+    // 그 상태의 "끊김"은 브로커 탓이 아니므로 갈아타지 말고 다시 지켜본다.
+    if(document.hidden){ armStall(); return }
+    var old=cl; cl=null;
+    try{ old&&old.end(true) }catch(e){}
+    open();
+  }
+  function giveUp(){
+    setState('dead');
+    if(pendRej){var r=pendRej;pendRes=pendRej=null;r(new Error('broker'))}
+  }
+  function open(){
+    if(dead)return;
+    if(bi>=BROKERS.length){ bi=0; rounds++; }              // 목록을 순환시킨다
+    if(rounds>=MAX_ROUNDS)return giveUp();
+    var url=BROKERS[bi++];
+    var c=window.mqtt.connect(url,{clientId:'ox_'+Math.random().toString(16).slice(2,10),
+      clean:true,reconnectPeriod:2500,connectTimeout:7000,keepalive:30});
+    var settled=false;
+    var to=setTimeout(function(){
+      if(settled)return;
+      settled=true;try{c.end(true)}catch(e){};open();
+    },CONNECT_MS);
+    c.on('connect',function(){
+      settled=true;clearTimeout(to);clearStall();
+      cl=c;rounds=0;                                      // 붙었으면 바퀴 수를 리셋
+      Object.keys(subs).forEach(function(t){c.subscribe(t,{qos:0})});
+      setState('on');
+      if(pendRes){var r=pendRes;pendRes=pendRej=null;r(url)}
+    });
+    c.on('error',function(){
+      if(settled)return;
+      settled=true;clearTimeout(to);try{c.end(true)}catch(e){};open();
+    });
+    c.on('close',  function(){ if(cl===c){setState('off');armStall()} });
+    c.on('offline',function(){ if(cl===c){setState('off');armStall()} });
+    c.on('reconnect',function(){ if(cl===c){setState('re');armStall()} });
+    c.on('message',function(t,p){
+      if(cl!==c)return;                                   // 버린 클라이언트의 잔여 메시지 무시
+      var fn=subs[t];if(!fn)return;
+      var v=p.toString();
+      try{ fn(v?JSON.parse(v):null) }catch(e){}
+    });
+  }
+
   return {
     connect:function(onState){
+      notify=onState;
+      if(cl)return Promise.resolve('');
       return loadMqtt().then(function(){
         return new Promise(function(res,rej){
-          (function tryOne(){
-            if(bi>=BROKERS.length)return rej(new Error('broker'));
-            var url=BROKERS[bi++];
-            var c=window.mqtt.connect(url,{clientId:'ox_'+Math.random().toString(16).slice(2,10),
-              clean:true,reconnectPeriod:2500,connectTimeout:7000,keepalive:30});
-            var done=false;
-            var to=setTimeout(function(){if(!done){done=true;try{c.end(true)}catch(e){};tryOne()}},8000);
-            c.on('connect',function(){ if(done&&cl!==c)return; done=true;clearTimeout(to);cl=c;
-              Object.keys(subs).forEach(function(t){c.subscribe(t,{qos:0})});
-              onState('on');res(url);});
-            c.on('error',function(){ if(!done){done=true;clearTimeout(to);try{c.end(true)}catch(e){};tryOne()} });
-            c.on('offline',function(){onState('off')});
-            c.on('reconnect',function(){onState('re')});
-            c.on('message',function(t,p){
-              var fn=subs[t];if(!fn)return;
-              var s=p.toString();
-              try{ fn(s?JSON.parse(s):null) }catch(e){}
-            });
-          })();
+          pendRes=res;pendRej=rej;
+          bi=0;rounds=0;dead=false;
+          open();
         });
       });
     },
+    rescan:function(){ if(!dead&&cl)promote() },   // 방장을 놓친 참가자가 다음 브로커를 훑을 때
     sub:function(t,fn){subs[t]=fn;if(cl)cl.subscribe(t,{qos:0})},
     unsub:function(t){delete subs[t];if(cl)cl.unsubscribe(t)},
     pub:function(t,obj,retain){if(cl)cl.publish(t,obj===null?'':JSON.stringify(obj),{qos:0,retain:!!retain})},
-    end:function(){try{cl&&cl.end(true)}catch(e){}}
+    end:function(){dead=true;clearStall();try{cl&&cl.end(true)}catch(e){};cl=null}
   };
 }
 var NET=window.__OXNET__||makeMqttNet();
@@ -400,7 +448,7 @@ var NET=window.__OXNET__||makeMqttNet();
 var app=document.getElementById('app'),connBar=document.getElementById('conn');
 var S={screen:'home',name:'',emojiIdx:Math.floor(Math.random()*EMOJIS.length),code:'',pid:rid(8),
   isHost:false,myChoice:null,offset:0,seenRound:null,err:'',net:'idle',lastState:0,fxRd:null,overKey:null,
-  chat:[],unread:0,chatOpen:false,lastSent:0,chatSeen:{}};
+  chat:[],unread:0,chatOpen:false,lastSent:0,chatSeen:{},lastPubSeen:0,lastScan:0};
 var REDUCED=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 var V=null,G=null,hostTimer=null,uiTimer=null,hbTimer=null;
 
@@ -453,9 +501,25 @@ function renderHome(){
 }
 function fail(m){S.err=m;var e=document.getElementById('er');if(e)e.textContent=m}
 function setNet(s){
+  var was=S.net;
   S.net=s;
-  if(s==='on'){connBar.classList.remove('show')}
-  else{connBar.textContent=s==='re'?'연결이 끊겨 재접속 중…':'네트워크 연결 대기 중…';connBar.classList.add('show')}
+  if(s==='on'){
+    connBar.classList.remove('show');
+    S.lastScan=Date.now();   // 방금 붙었다. 상태가 도착할 때까지 재탐색을 미룬다
+    // 방장 회선이 돌아왔다. 끊겨 있던 동안 하트비트를 못 받았을 뿐이니
+    // 곧바로 쫓아내지 말고 참가자 전원에게 유예를 다시 준다.
+    if(was&&was!=='on'&&was!=='idle'&&S.isHost&&G){
+      var t=Date.now(),pid;
+      for(pid in G.players)G.players[pid].seen=t;
+      G.dirty=true;
+    }
+  }else if(s==='dead'){
+    connBar.textContent='연결이 불안정합니다. 새로고침해 주세요';
+    connBar.classList.add('show');
+  }else{
+    connBar.textContent=s==='re'?'연결이 끊겨 재접속 중…':'네트워크 연결 대기 중…';
+    connBar.classList.add('show');
+  }
 }
 
 function ensureNet(){
@@ -484,7 +548,7 @@ async function joinRoom(){
   if(c.length!==5){fail('코드 5자리를 입력하세요.');return}
   fail('연결 중…');
   try{ await ensureNet() }catch(e){ fail('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.'); return }
-  S.code=c; S.isHost=false; S.lastState=0;
+  S.code=c; S.isHost=false; S.lastState=0; S.lastPubSeen=0; S.lastScan=0;
   NET.sub(tState(),onState);
   NET.sub(tChat(),onChat);
   NET.pub(tEv(),{t:'join',pid:S.pid,name:S.name,em:S.emojiIdx});
@@ -507,7 +571,7 @@ function leaveRoom(){
   hostTimer=hbTimer=uiTimer=null;
   V=null;G=null;S.code='';S.isHost=false;S.myChoice=null;S.screen='home';S.err='';S.seenRound=null;
   S.fxRd=null;S.overKey=null;chEls={};
-  S.chat=[];S.unread=0;S.chatSeen={};closeChat();
+  S.chat=[];S.unread=0;S.chatSeen={};S.lastPubSeen=0;S.lastScan=0;closeChat();
   if(location.hash)history.replaceState(null,'',location.pathname);
   render();
 }
@@ -516,13 +580,30 @@ function startHeartbeat(){
   hbTimer=setInterval(function(){
     if(!S.code)return;
     NET.pub(tEv(),{t:'hb',pid:S.pid,name:S.name,em:S.emojiIdx});
+    hostWatch();
   },3500);
+}
+// 방장의 상태가 한동안 끊기면 방장이 다른 브로커로 옮겨갔을 수 있다.
+// 가만히 있으면 갈라진 채 방이 죽으므로 주기적으로 다음 브로커를 훑는다.
+// (게임 화면에서만 도는 tickUI가 아니라 하트비트에 둬야 대기실·결과 화면에서도 동작한다)
+function hostWatch(){
+  if(S.isHost||!S.lastState)return;
+  if(S.net!=='on')return;                 // 이미 재접속 중이면 굳이 더 흔들지 않는다
+  if(Date.now()-S.lastState<=13000)return;
+  connBar.textContent='방장과 연결이 끊겼습니다 — 다른 경로를 찾는 중…';
+  connBar.classList.add('show');
+  if(Date.now()-(S.lastScan||0)>9000){ S.lastScan=Date.now(); NET.rescan() }
 }
 
 /* ================= 클라이언트 수신 ================= */
 function onState(v){
   if(!v){ if(S.screen!=='home'){alert('방장이 방을 닫았습니다.');leaveRoom()} return }
-  S.lastState=Date.now(); S.offset=v.pub-Date.now(); V=v; fail(''); applyView();
+  // 브로커에 retain된 옛 상태가 되살아난 것일 수 있다. 메시지가 왔다는 사실이 아니라
+  // 방장의 발행 시각이 "앞으로 나아갔는지"로 살아있음을 판정한다.
+  var fresh=!(v.pub&&S.lastPubSeen&&v.pub<=S.lastPubSeen);
+  if(v.pub)S.lastPubSeen=Math.max(S.lastPubSeen||0,v.pub);
+  if(fresh){ S.lastState=Date.now(); if(S.net==='on')connBar.classList.remove('show') }
+  S.offset=v.pub-Date.now(); V=v; fail(''); applyView();
 }
 
 /* ================= 방장 로직 ================= */
@@ -557,8 +638,12 @@ function startHost(){
 function hostTick(){
   if(!G)return;
   var t=Date.now();
-  for(var pid in G.players){
-    if(pid!==S.pid&&t-G.players[pid].seen>11000){delete G.players[pid];G.dirty=true}
+  // 방장 회선이 끊긴 동안에는 참가자를 제거하지 않는다.
+  // 안 그러면 방장 쪽 네트워크 문제 하나로 참가자가 전원 쫓겨나 방이 해체된다.
+  if(S.net==='on'){
+    for(var pid in G.players){
+      if(pid!==S.pid&&t-G.players[pid].seen>11000){delete G.players[pid];G.dirty=true}
+    }
   }
   if(G.phase==='ready'){ if(t>=G.endsAt){startQuestion();G.dirty=true} }
   else if(G.phase==='question'){
@@ -701,8 +786,12 @@ function closeChat(){
 function toggleChat(){S.chatOpen?closeChat():openChat()}
 
 /* ================= 버전 정보 ================= */
-var VERSION='1.3.0';
+var VERSION='1.3.1';
 var CHANGELOG=[
+ {v:'1.3.1',t:['연결이 한 번 끊기면 영영 복구되지 않던 문제 수정 — 되돌아오지 못하면 다른 브로커로 자동 전환',
+               '방장 인터넷이 잠깐 끊겼을 때 참가자가 전원 튕겨나가 방이 해체되던 문제 수정',
+               '방장이 다른 경로로 옮겨가면 참가자도 따라가도록 보완',
+               '창을 닫을 때 연결을 정리해 브로커 접속 제한에 걸릴 확률을 낮춤']},
  {v:'1.3.0',t:['게임 중에도 채팅할 수 있는 플로팅 채팅창 추가 (안 읽은 메시지 수 표시)',
                '채팅을 방장 경유가 아닌 전용 채널로 분리해 지연을 줄임',
                '버전 정보 버튼 추가']},
@@ -1044,9 +1133,6 @@ function tickUI(){
   var left=Math.max(0,V.endsAt-(Date.now()+S.offset));
   tf.style.width=Math.max(0,Math.min(100,left/total*100))+'%';
   tf.classList.toggle('warn',V.ph==='question'&&left<4000);
-  if(!S.isHost&&S.lastState&&Date.now()-S.lastState>13000){
-    connBar.textContent='방장과 연결이 끊겼습니다';connBar.classList.add('show');
-  }
 }
 var ac=null;
 function actx(){ac=ac||new (window.AudioContext||window.webkitAudioContext)();return ac}
@@ -1134,6 +1220,7 @@ function renderOver(){
 window.addEventListener('beforeunload',function(){
   if(S.code){NET.pub(tEv(),{t:'leave',pid:S.pid});if(S.isHost)NET.pub(tState(),null,true)}
 });
+window.addEventListener('pagehide',function(){ try{NET.end()}catch(e){} });
 document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&S.code)NET.pub(tEv(),{t:'hb',pid:S.pid,name:S.name,em:S.emojiIdx});
 });
