@@ -93,9 +93,18 @@ window.GAMES = [
     // 반대로 `1:1`(오목)은 남긴다 — 나머지 멀티가 전부 3~10인이라
     // "둘이서 할 게임"을 찾을 다른 수단이 없다.
     tags: ["아케이드", "멀티"],
-    // games/stairs/ 가 아직 커밋되지 않아 배포본에 파일이 없다. ready로 두면
-    // 카드는 보이는데 클릭하면 404가 난다. 커밋·배포 확인 후 "ready"로.
-    status: "wip",
+    status: "ready",
+    added: "2026-08-28"
+  },
+  {
+    id: "wordbattle",
+    title: "영어 끝말잇기",
+    desc: "앞 단어의 마지막 글자로 잇는 영어 단어 대결. AI 기사와 체력을 걸고 겨룬다.",
+    path: "games/wordbattle/index.html",
+    emoji: "🔤",
+    color: ["#818cf8", "#1e1b4b"],
+    tags: ["영어", "싱글", "퍼즐"],
+    status: "ready",
     added: "2026-08-28"
   }
 ];
