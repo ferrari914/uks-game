@@ -125,9 +125,13 @@ header { padding: var(--s8) 0 var(--s6); text-align: center; }
 }
 .pill b { color: var(--text); font-weight: 700; }
 
-/* 프로필 진입점 — 게임 카드와 구분되도록 헤더 안에 가로형으로 둔다 */
+/* 프로필·방명록 진입점 — 게임 카드와 구분되도록 헤더 안에 가로형으로 둔다 */
+.hub-links {
+  margin-top: var(--s6);
+  display: flex; gap: var(--s3);
+  justify-content: center; flex-wrap: wrap;
+}
 .profile-link {
-  margin: var(--s6) auto 0;
   min-height: var(--tap);
   display: inline-flex; align-items: center; gap: var(--s3);
   max-width: 100%; text-align: left;

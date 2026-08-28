@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>방명록 — Englknight</title>
+<meta name="description" content="Englknight를 다녀간 사람들이 남긴 한마디">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📜</text></svg>">
+<!-- 허브와 같은 팔레트·포커스·모션 규칙을 그대로 쓴다 -->
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .gb-back {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    min-height: var(--tap);
+    color: var(--muted); text-decoration: none;
+    font-size: 14px; font-weight: 600;
+  }
+  .gb-back:hover { color: var(--text); }
+
+  .gb-head { text-align: center; padding: var(--s4) 0 var(--s6); }
+  .gb-head h1 {
+    font-size: clamp(28px, 6vw, 44px); font-weight: 900; letter-spacing: -1px;
+    background: linear-gradient(120deg, var(--accent), #a78bfa 55%, var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .gb-head p { margin-top: var(--s2); color: var(--muted); font-size: 14px; }
+
+  .gb-main { max-width: 720px; margin: 0 auto; padding-bottom: var(--s8); }
+
+  /* ===== 연결 상태 ===== */
+  .gb-status {
+    display: flex; align-items: center; gap: var(--s2);
+    justify-content: center;
+    font-size: 13px; color: var(--muted);
+    padding: var(--s2) var(--s4);
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card); margin: 0 auto var(--s6);
+    width: fit-content; max-width: 100%;
+  }
+  .gb-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+    background: var(--muted-2);
+  }
+  .gb-status[data-state="on"]   .gb-dot { background: var(--ready); }
+  .gb-status[data-state="off"]  .gb-dot { background: var(--wip); }
+  .gb-status[data-state="fail"] .gb-dot { background: var(--accent-2); }
+
+  /* ===== 작성 폼 ===== */
+  .gb-form {
+    background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: var(--s4); margin-bottom: var(--s6);
+  }
+  .gb-row { display: flex; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
+  .gb-field { flex: 1 1 100%; }
+  .gb-field.name { flex: 0 1 200px; }
+  .gb-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: var(--s1); }
+
+  .gb-input, .gb-text {
+    width: 100%; min-height: var(--tap);
+    background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: var(--s3); padding: var(--s2) var(--s3);
+    color: var(--text); font-size: 15px; font-family: inherit;
+    outline: none; transition: border-color .18s, box-shadow .18s;
+  }
+  .gb-text { min-height: 96px; resize: vertical; line-height: 1.55; }
+  .gb-input::placeholder, .gb-text::placeholder { color: var(--muted-2); }
+  .gb-input:focus-visible, .gb-text:focus-visible {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,.14); outline: none;
+  }
+
+  .gb-bar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+  .gb-count { font-size: 12px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+  .gb-count.over { color: var(--accent-2); }
+  .gb-send {
+    margin-left: auto; min-height: var(--tap);
+    padding: var(--s2) var(--s6);
+    background: var(--accent); border: 1px solid var(--accent); border-radius: 999px;
+    color: #06121a; font-size: 14px; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: opacity .18s, background .18s;
+  }
+  .gb-send:disabled { opacity: .45; cursor: not-allowed; }
+  .gb-note { font-size: 12px; color: var(--muted-2); margin-top: var(--s3); line-height: 1.6; }
+
+  /* ===== 목록 ===== */
+  .gb-list { list-style: none; display: flex; flex-direction: column; gap: var(--s3); }
+  .gb-entry {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: var(--s4);
+  }
+  .gb-entry.mine { border-color: var(--line-2); }
+  .gb-meta {
+    display: flex; align-items: baseline; gap: var(--s2);
+    flex-wrap: wrap; margin-bottom: var(--s2);
+  }
+  .gb-name { font-weight: 800; font-size: 15px; }
+  .gb-time { font-size: 12px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+  .gb-badge {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    border: 1px solid currentColor; border-radius: 999px; padding: 1px var(--s2);
+  }
+  .gb-body { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+  .gb-del {
+    margin-top: var(--s3); min-height: 32px;
+    background: none; border: 1px solid var(--line);
+    border-radius: 999px; padding: var(--s1) var(--s3);
+    color: var(--muted); font-size: 12px; font-family: inherit; cursor: pointer;
+    transition: color .18s, border-color .18s;
+  }
+  .gb-del:hover { color: var(--text); border-color: var(--line-2); }
+
+  .gb-empty {
+    text-align: center; padding: var(--s8) var(--s4);
+    color: var(--muted); border: 1px dashed var(--line); border-radius: var(--radius);
+  }
+  .gb-empty .big { font-size: 40px; margin-bottom: var(--s3); }
+
+  @media (max-width: 560px) {
+    .gb-field.name { flex: 1 1 100%; }
+    .gb-send { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#write">방명록 쓰기로 건너뛰기</a>
+
+<div class="wrap">
+
+  <p><a class="gb-back" href="../index.html"><span aria-hidden="true">←</span> 허브로 돌아가기</a></p>
+
+  <div class="gb-head">
+    <h1>방명록</h1>
+    <p>다녀간 흔적을 한 줄 남겨주세요.</p>
+  </div>
+
+  <main class="gb-main">
+
+    <p class="gb-status" id="status" data-state="wait" role="status" aria-live="polite">
+      <span class="gb-dot" aria-hidden="true"></span><span id="statusText">연결하는 중…</span>
+    </p>
+
+    <form class="gb-form" id="write">
+      <div class="gb-row">
+        <div class="gb-field name">
+          <label for="gbName">이름</label>
+          <input id="gbName" class="gb-input" type="text" maxlength="12"
+                 placeholder="이름 없는 나그네" autocomplete="off">
+        </div>
+      </div>
+      <div class="gb-field">
+        <label for="gbText">한마디</label>
+        <textarea id="gbText" class="gb-text" maxlength="200"
+                  placeholder="여기 다녀갑니다!"></textarea>
+      </div>
+      <div class="gb-bar">
+        <span class="gb-count" id="count">0 / 200</span>
+        <button class="gb-send" type="submit" id="send" disabled>남기기</button>
+      </div>
+      <p class="gb-note" id="formNote">
+        누구나 볼 수 있는 공개 게시판입니다. 개인정보는 적지 마세요.
+      </p>
+    </form>
+
+    <h2 class="sr-only">남겨진 글</h2>
+    <ul class="gb-list" id="list"></ul>
+
+  </main>
+
+</div>
+
+<footer>Englknight · 방명록은 최근 <b>30개</b>까지 보관됩니다</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     방명록 저장 방식
+     ---------------------------------------------------------
+     GitHub Pages는 정적 배포라 서버·DB가 없다. 그래서 게임들이 쓰는 것과
+     같은 공용 MQTT 브로커에, 글 하나를 "retain 메시지" 하나로 얹어 둔다.
+     retain 메시지는 나중에 접속한 사람에게도 그대로 전달되므로 목록이 남는다.
+
+     슬롯 30칸을 돌려 쓰는 링 버퍼다. 새 글의 번호(seq)를 slot = seq % 30 에
+     넣으므로 31번째 글이 1번째 글을 덮는다.
+
+     브로커 폴백을 쓰지 않는 이유:
+     게임은 방 하나가 잠깐 살아 있다 사라지지만 방명록은 모두가 "같은 목록"을
+     봐야 한다. 브로커를 여러 개 돌리면 방문자마다 다른 브로커에 붙어 서로
+     다른 방명록을 보게 된다(각 브로커가 자기 retain 메시지만 갖고 있으므로).
+     그래서 한 곳만 쓰고, 실패하면 실패라고 알린다.
+     ========================================================= */
+
+  var BROKER   = 'wss://broker.emqx.io:8084/mqtt';
+  var MQTT_CDN = [
+    'https://unpkg.com/mqtt@5.14.1/dist/mqtt.min.js',
+    'https://cdn.jsdelivr.net/npm/mqtt@5.14.1/dist/mqtt.min.js'
+  ];
+  var TOPIC   = 'englknight/guestbook/v1/e/';
+  var SLOTS   = 30;
+  var MAX_LEN = 200;
+  var COOLDOWN_MS = 15000;   // 도배 방지: 한 브라우저에서 15초에 한 번
+
+  var KEY_MINE = 'englknight-gb-mine';   // 내가 쓴 글 번호 (삭제 버튼용)
+  var KEY_LAST = 'englknight-gb-last';   // 마지막 작성 시각
+  var KEY_NAME = 'englknight-gb-name';   // 이름 기억
+
+  var statusEl = document.getElementById('status');
+  var statusText = document.getElementById('statusText');
+  var listEl   = document.getElementById('list');
+  var nameEl   = document.getElementById('gbName');
+  var textEl   = document.getElementById('gbText');
+  var sendEl   = document.getElementById('send');
+  var countEl  = document.getElementById('count');
+  var formEl   = document.getElementById('write');
+  var noteEl   = document.getElementById('formNote');
+
+  var ESC = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ESC[c]; });
+  };
+
+  var store = {
+    get: function (k, dflt) {
+      try { var v = localStorage.getItem(k); return v == null ? dflt : v; }
+      catch (e) { return dflt; }
+    },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  var mine = (function () {
+    try { return JSON.parse(store.get(KEY_MINE, '[]')) || []; } catch (e) { return []; }
+  })();
+
+  var entries = {};   // slot -> {q,n,t,d}
+  var client  = null;
+  var ready   = false;
+
+  /* ===== 화면 ===== */
+
+  function setStatus(state, text) {
+    statusEl.setAttribute('data-state', state);
+    statusText.textContent = text;
+  }
+
+  function when(ts) {
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    var p = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + '.' + p(d.getMonth() + 1) + '.' + p(d.getDate())
+         + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function render() {
+    var rows = [];
+    for (var k in entries) if (entries[k]) rows.push(entries[k]);
+    rows.sort(function (a, b) { return b.q - a.q; });
+
+    if (!rows.length) {
+      listEl.innerHTML = ready
+        ? '<li class="gb-empty"><div class="big" aria-hidden="true">📜</div>'
+          + '<p>아직 아무도 남기지 않았어요. 첫 글을 남겨보세요.</p></li>'
+        : '<li class="gb-empty"><p>불러오는 중…</p></li>';
+      return;
+    }
+
+    listEl.innerHTML = rows.map(function (e) {
+      var isMine = mine.indexOf(e.q) !== -1;
+      return '<li class="gb-entry' + (isMine ? ' mine' : '') + '">'
+        + '<div class="gb-meta">'
+        +   '<span class="gb-name">' + esc(e.n || '이름 없는 나그네') + '</span>'
+        +   '<span class="gb-time">' + esc(when(e.d)) + '</span>'
+        +   (isMine ? '<span class="gb-badge">내 글</span>' : '')
+        + '</div>'
+        + '<div class="gb-body">' + esc(e.t) + '</div>'
+        + (isMine ? '<button class="gb-del" type="button" data-q="' + e.q + '">삭제</button>' : '')
+        + '</li>';
+    }).join('');
+  }
+
+  /* ===== 입력 ===== */
+
+  nameEl.value = store.get(KEY_NAME, '');
+
+  function refreshForm() {
+    var len = textEl.value.trim().length;
+    countEl.textContent = len + ' / ' + MAX_LEN;
+    countEl.classList.toggle('over', len > MAX_LEN);
+    sendEl.disabled = !ready || len === 0 || len > MAX_LEN;
+  }
+
+  textEl.addEventListener('input', refreshForm);
+  nameEl.addEventListener('input', function () { store.set(KEY_NAME, nameEl.value); });
+
+  formEl.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (sendEl.disabled) return;
+
+    var last = parseInt(store.get(KEY_LAST, '0'), 10) || 0;
+    var wait = COOLDOWN_MS - (Date.now() - last);
+    if (wait > 0) {
+      noteEl.textContent = Math.ceil(wait / 1000) + '초 뒤에 다시 남길 수 있어요.';
+      return;
+    }
+
+    var maxQ = -1;
+    for (var k in entries) if (entries[k] && entries[k].q > maxQ) maxQ = entries[k].q;
+    var q = maxQ + 1;
+
+    var entry = {
+      q: q,
+      n: nameEl.value.trim().slice(0, 12),
+      t: textEl.value.trim().slice(0, MAX_LEN),
+      d: Date.now()
+    };
+
+    client.publish(TOPIC + (q % SLOTS), JSON.stringify(entry), { qos: 0, retain: true });
+
+    mine.push(q);
+    store.set(KEY_MINE, JSON.stringify(mine.slice(-100)));
+    store.set(KEY_LAST, String(Date.now()));
+
+    textEl.value = '';
+    refreshForm();
+    noteEl.textContent = '남겼습니다. 잠시 뒤 목록에 나타납니다.';
+  });
+
+  // 내 글 삭제 = 그 슬롯의 retain 메시지를 빈 값으로 덮어쓴다
+  listEl.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('.gb-del');
+    if (!btn || !ready) return;
+    var q = parseInt(btn.dataset.q, 10);
+    if (mine.indexOf(q) === -1) return;
+    client.publish(TOPIC + (q % SLOTS), '', { qos: 0, retain: true });
+  });
+
+  /* ===== 연결 ===== */
+
+  function loadMqtt() {
+    return new Promise(function (res, rej) {
+      if (window.mqtt) return res();
+      var i = 0;
+      (function next() {
+        if (i >= MQTT_CDN.length) return rej(new Error('cdn'));
+        var s = document.createElement('script');
+        s.src = MQTT_CDN[i++];
+        s.onload = function () { res(); };
+        s.onerror = next;
+        document.head.appendChild(s);
+      })();
+    });
+  }
+
+  function connect() {
+    // wss는 file:// 에서 브라우저가 차단한다 (게임들도 같은 제약)
+    if (location.protocol === 'file:') {
+      setStatus('fail', '방명록은 https 주소에서만 동작합니다');
+      noteEl.textContent = '파일을 직접 연 상태에서는 글을 불러오거나 남길 수 없습니다. '
+        + '배포 주소에서 열어주세요.';
+      ready = false; refreshForm(); render();
+      return;
+    }
+
+    loadMqtt().then(function () {
+      client = window.mqtt.connect(BROKER, {
+        clientId: 'gb_' + Math.random().toString(16).slice(2, 10),
+        clean: true, reconnectPeriod: 3000, connectTimeout: 8000, keepalive: 30
+      });
+
+      client.on('connect', function () {
+        ready = true;
+        setStatus('on', '연결됨');
+        client.subscribe(TOPIC + '+', { qos: 0 });
+        refreshForm();
+        // retain 메시지는 구독 직후 몰려 들어온다. 잠시 뒤 빈 목록이면 진짜 빈 것.
+        setTimeout(render, 1200);
+      });
+
+      client.on('message', function (topic, payload) {
+        var slot = topic.slice(TOPIC.length);
+        var raw = payload.toString();
+        if (!raw) { delete entries[slot]; render(); return; }   // 삭제된 슬롯
+        try {
+          var e = JSON.parse(raw);
+          if (typeof e.q === 'number' && typeof e.t === 'string') {
+            entries[slot] = e;
+            render();
+          }
+        } catch (err) { /* 깨진 값은 무시 */ }
+      });
+
+      client.on('offline',   function () { ready = false; setStatus('off', '연결이 끊겼습니다. 다시 연결하는 중…'); refreshForm(); });
+      client.on('reconnect', function () { setStatus('off', '다시 연결하는 중…'); });
+      client.on('error',     function () { setStatus('off', '연결에 문제가 있습니다'); });
+    }).catch(function () {
+      setStatus('fail', '방명록 서버에 연결하지 못했습니다');
+      noteEl.textContent = '잠시 뒤 새로고침해 주세요.';
+      ready = false; refreshForm(); render();
+    });
+  }
+
+  render();
+  refreshForm();
+  connect();
+})();
+</script>
+</body>
+</html>
