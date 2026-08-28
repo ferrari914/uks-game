@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>오목 — Englknight</title>
+<style>
+:root{
+  --bg:#0a0b12; --card:#161927; --line:#262b40; --tx:#e8eaf2; --dim:#98a0bd; --pt:#00e5ff;
+  --wood:#c99a63; --wood2:#b8894f; --grid:#4a331c; --bad:#ff5a6a; --ok:#4ade80;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  min-height:100vh;font-size:15px;line-height:1.5}
+#app{max-width:520px;margin:0 auto;padding:10px 14px calc(18px + env(safe-area-inset-bottom))}
+a{color:var(--pt)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:46px;padding:0 18px;border-radius:12px;background:var(--card);
+  border:1px solid var(--line);color:var(--tx);font-weight:600;transition:.12s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:linear-gradient(135deg,#00e5ff,#3d7bff);color:#06121a;border-color:transparent}
+.btn.dan{border-color:#5a2733;color:#ff8a96}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.sm{min-height:38px;padding:0 12px;font-size:13px;font-weight:500}
+input{font:inherit;width:100%;min-height:46px;padding:0 14px;border-radius:12px;
+  background:#10131f;border:1px solid var(--line);color:var(--tx)}
+input:focus{outline:2px solid var(--pt);outline-offset:-1px}
+
+/* ── 상단 바: 버전 버튼은 첫 화면에서 스크롤 없이 보여야 한다 ───────── */
+.top{display:flex;align-items:center;gap:8px;padding:2px 0 10px}
+.top .sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:0 11px;
+  border-radius:999px;background:var(--card);border:1px solid var(--line);
+  font-size:12px;color:var(--dim);font-weight:600}
+.chip.on{color:var(--ok);border-color:#1e4632}
+.chip.off{color:#ffcf6b;border-color:#4a3a17}
+.chip.dead{color:var(--bad);border-color:#4d2029}
+
+h1{margin:6px 0 2px;font-size:30px;letter-spacing:-.5px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;
+  background:rgba(0,229,255,.12);color:var(--pt);vertical-align:6px;margin-left:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.lbl{font-size:12px;color:var(--dim);margin:0 0 6px;font-weight:600}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.err{color:var(--bad);font-size:13px;margin-top:8px;min-height:18px}
+.hint{color:var(--dim);font-size:12.5px}
+
+/* ── 대국 화면 ─────────────────────────────────────────── */
+.players{display:flex;gap:8px;margin-bottom:10px}
+.pl{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 11px;
+  display:flex;align-items:center;gap:9px;min-width:0}
+.pl.turn{border-color:var(--pt);box-shadow:0 0 0 1px var(--pt) inset}
+.dot{width:20px;height:20px;border-radius:50%;flex:none}
+.dot.b{background:#15161c;border:1px solid #4a4f66}
+.dot.w{background:#f2f4fb;border:1px solid #8d93aa}
+.pnm{font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pst{font-size:11px;color:var(--dim)}
+.pst.warn{color:#ffcf6b}
+.pst.bad{color:var(--bad)}
+.sc{font-size:13px;font-weight:800;color:var(--pt);flex:none}
+
+/* 판만은 다크 테마 예외 — 배경 #0a0b12에 흑돌을 얹으면 묻힌다 */
+.bwrap{background:linear-gradient(160deg,var(--wood),var(--wood2));
+  border-radius:14px;padding:0;border:1px solid #7d5a30;overflow:hidden;
+  box-shadow:0 6px 20px rgba(0,0,0,.45)}
+#bd{display:block;width:100%;height:auto;touch-action:manipulation}
+
+.bar{margin-top:10px;display:flex;gap:8px;align-items:center}
+.coord{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;min-width:52px}
+.turnmsg{font-size:13.5px;font-weight:700}
+.turnmsg .mine{color:var(--pt)}
+.acts{display:flex;gap:8px;margin-top:8px}
+.acts .btn{flex:1}
+
+.note{margin-top:10px;padding:11px 13px;border-radius:12px;font-size:13px;
+  background:rgba(255,207,107,.08);border:1px solid #4a3a17;color:#ffcf6b}
+.note.bad{background:rgba(255,90,106,.08);border-color:#4d2029;color:#ff9aa4}
+.note .acts{margin-top:9px}
+
+/* ── 시트/모달 ─────────────────────────────────────────── */
+.sheet{position:fixed;inset:0;background:rgba(4,6,12,.72);display:flex;align-items:flex-end;
+  justify-content:center;z-index:50;padding:0}
+.sheet .inner{background:var(--card);border:1px solid var(--line);border-bottom:none;
+  border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:82vh;overflow:auto;
+  padding:18px 16px calc(20px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 12px;font-size:17px}
+.vlog{margin:0 0 14px}
+.vlog .v{font-weight:800;color:var(--pt);font-size:13px;margin-bottom:4px}
+.vlog ul{margin:0;padding-left:18px;color:var(--dim);font-size:13px}
+.vlog li{margin:3px 0}
+.rule dt{font-weight:700;margin-top:11px;font-size:13.5px}
+.rule dd{margin:3px 0 0;color:var(--dim);font-size:13px}
+.x{color:var(--bad);font-weight:800}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}.btn:active{transform:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="renju.js"></script>
+<script>
+'use strict';
+/* ============================================================
+ * 오목 (렌주룰) — Englknight
+ * 규칙 판정은 renju.js에 있다. 이 파일은 화면과 통신만 맡는다.
+ * ============================================================ */
+var VERSION='1.0.0';
+var CHANGELOG=[
+ {v:'1.0.0',t:[
+   '오목 첫 공개 — 방 코드로 친구와 1:1 온라인 대국',
+   '렌주룰 적용: 흑은 삼삼·사사·장목 금수, 정확히 5목만 승리 (백은 제한 없음)',
+   '금수 자리를 붉은 ✕로 미리 표시하고, 탭하면 이유를 알려준다',
+   '모바일 오착 방지 — 한 번 탭해 미리보기, 다시 탭해야 확정',
+   '시간 초과 몰수패 없음. 상대 연결이 끊기면 알려주고 빠져나올 길을 연다',
+   '무르기(상대 동의 · 직전 1수 · 판당 3회), 기권, 선후공 교대 재대국'
+ ]}
+];
+
+/* renju.js가 안 실려 오면 판정을 할 수 없다. 빈 화면 대신 원인을 보여준다.
+   (classic script는 file://에서도 형제 파일을 읽지만, 파일을 따로 옮기면 깨진다) */
+if(!window.RENJU){
+  document.getElementById('app').innerHTML=
+    '<div class="card" style="margin-top:24px"><h3 style="margin:0 0 8px">규칙 파일을 불러오지 못했습니다</h3>'+
+    '<p class="hint">이 게임은 <b>index.html</b>과 <b>renju.js</b> 두 파일이 같은 폴더에 함께 있어야 합니다. '+
+    '한쪽만 옮기거나 지우면 판정을 할 수 없어 게임이 시작되지 않습니다.</p>'+
+    '<p class="hint" style="margin-top:10px"><a href="../../index.html">← 게임 허브로 돌아가기</a></p></div>';
+  throw new Error('renju.js missing');
+}
+var R=window.RENJU, N=R.N;
+/* 조사가 사유마다 달라서('삼삼은' / '사사는') 문장을 통째로 갖는다 */
+var FORBID_MSG={three:'삼삼은 흑이 둘 수 없습니다 (금수)',
+                four:'사사는 흑이 둘 수 없습니다 (금수)',
+                overline:'여섯 목(장목)은 흑이 둘 수 없습니다 (금수)'};
+var EMPTY=R.EMPTY, BLACK=R.BLACK, WHITE=R.WHITE;
+
+/* ================= 통신 계층 (ox-survival 검증본 재사용) ================= */
+var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+var MQTT_CDN=['https://unpkg.com/mqtt@5.14.1/dist/mqtt.min.js','https://cdn.jsdelivr.net/npm/mqtt@5.14.1/dist/mqtt.min.js'];
+var CONNECT_MS=8000, STALL_MS=12000, MAX_ROUNDS=3;
+
+function loadMqtt(){
+  return new Promise(function(res,rej){
+    if(window.mqtt)return res();
+    var i=0;
+    (function next(){
+      if(i>=MQTT_CDN.length)return rej(new Error('mqtt-load'));
+      var s=document.createElement('script');
+      s.src=MQTT_CDN[i++];s.onload=function(){res()};s.onerror=next;
+      document.head.appendChild(s);
+    })();
+  });
+}
+/* 공용 브로커는 IP당 연결 제한·주기적 강제 절단이 흔하다. mqtt.js의 reconnectPeriod는
+   "같은 브로커"만 무한 재시도하므로 한 번 거부당하면 영영 못 붙는다. 그래서 절단 후
+   STALL_MS 안에 못 돌아오면 클라이언트를 버리고 다음 브로커로 승격한다. */
+function makeMqttNet(){
+  var cl=null,subs={},bi=0,rounds=0,stallT=null,notify=null,dead=false,pendRes=null,pendRej=null;
+  function setState(x){ if(notify)notify(x) }
+  function clearStall(){ if(stallT){clearTimeout(stallT);stallT=null} }
+  function armStall(){ if(stallT||dead)return; stallT=setTimeout(function(){stallT=null;promote()},STALL_MS) }
+  function promote(){
+    if(dead)return; clearStall();
+    if(document.hidden){ armStall(); return }   // 탭이 숨으면 타이머가 조여 keepalive가 밀린다. 브로커 탓이 아니다
+    var old=cl; cl=null; try{ old&&old.end(true) }catch(e){}
+    open();
+  }
+  function giveUp(){ setState('dead'); if(pendRej){var r=pendRej;pendRes=pendRej=null;r(new Error('broker'))} }
+  function open(){
+    if(dead)return;
+    if(bi>=BROKERS.length){ bi=0; rounds++ }
+    if(rounds>=MAX_ROUNDS)return giveUp();
+    var url=BROKERS[bi++];
+    var c=window.mqtt.connect(url,{clientId:'ok_'+Math.random().toString(16).slice(2,10),
+      clean:true,reconnectPeriod:2500,connectTimeout:7000,keepalive:30});
+    var settled=false;
+    var to=setTimeout(function(){ if(settled)return; settled=true; try{c.end(true)}catch(e){} open() },CONNECT_MS);
+    c.on('connect',function(){
+      settled=true;clearTimeout(to);clearStall();
+      cl=c;rounds=0;
+      Object.keys(subs).forEach(function(t){c.subscribe(t,{qos:0})});
+      setState('on');
+      if(pendRes){var r=pendRes;pendRes=pendRej=null;r(url)}
+    });
+    c.on('error',function(){ if(settled)return; settled=true;clearTimeout(to);try{c.end(true)}catch(e){} open() });
+    c.on('close',  function(){ if(cl===c){setState('off');armStall()} });
+    c.on('offline',function(){ if(cl===c){setState('off');armStall()} });
+    c.on('reconnect',function(){ if(cl===c){setState('re');armStall()} });
+    c.on('message',function(t,p){
+      if(cl!==c)return;
+      var fn=subs[t];if(!fn)return;
+      var v=p.toString();
+      try{ fn(v?JSON.parse(v):null) }catch(e){}
+    });
+  }
+  return {
+    connect:function(onState){
+      notify=onState;
+      if(cl)return Promise.resolve('');
+      return loadMqtt().then(function(){
+        return new Promise(function(res,rej){ pendRes=res;pendRej=rej;bi=0;rounds=0;dead=false;open() });
+      });
+    },
+    sub:function(t,fn){subs[t]=fn;if(cl)cl.subscribe(t,{qos:0})},
+    unsub:function(t){delete subs[t];if(cl)cl.unsubscribe(t)},
+    ready:function(){ return !!(cl&&cl.connected) },
+    /* 끊긴 소켓에 publish하면 콘솔 에러가 나고 메시지도 사라진다. 붙어 있을 때만 보낸다.
+       못 보낸 착수는 아래 pendMove가 다시 보낸다. */
+    pub:function(t,obj,retain){ if(cl&&cl.connected)cl.publish(t,obj===null?'':JSON.stringify(obj),{qos:0,retain:!!retain}) },
+    end:function(){dead=true;clearStall();try{cl&&cl.end(true)}catch(e){};cl=null}
+  };
+}
+var NET=makeMqttNet();
+
+/* ================= 상태 ================= */
+var S={screen:'home',name:'',code:'',pid:rid(10),isHost:false,net:'idle',err:'',
+       ghost:-1,sheet:'',msg:'',lastSeen:0,hostSeen:0,copied:false,pend:null};
+var G=null;                 // 방 상태 (방장이 만들고 retain으로 뿌린다)
+var seen={};                // 방장: 참가자 pid -> 마지막 수신 시각
+var hostTimer=null,uiTimer=null,hbTimer=null;
+var REDUCED=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var app=document.getElementById('app');
+
+function rid(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s='';for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s}
+function esc(s){return String(s).replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
+function clean(s){var t=String(s||'').replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ ]/g,'').trim().slice(0,8);return t||'익명'}
+function now(){return Date.now()}
+function T(){return 'okm1/'+S.code}
+function tState(){return T()+'/state'}
+function tEv(){return T()+'/ev'}
+function inviteLink(){return location.origin+location.pathname+'#'+S.code}
+function cName(x,y){return 'ABCDEFGHIJKLMNO'.charAt(x)+(N-y)}
+
+/* ================= 판 계산 ================= */
+function boardOf(moves){
+  var b=R.emptyBoard();
+  for(var i=0;i<moves.length;i++) b[moves[i]]=(i%2===0)?BLACK:WHITE;
+  return b;
+}
+function turnColor(g){ return (g.moves.length%2===0)?BLACK:WHITE }
+/* 이번 판에서 검은 돌을 쥔 사람의 자리(0=방장,1=손님) */
+function seatOfColor(g,c){ return c===BLACK?g.blackSeat:(1-g.blackSeat) }
+function mySeat(g){ if(!g||!g.p)return -1; return g.p[0]&&g.p[0].pid===S.pid?0:(g.p[1]&&g.p[1].pid===S.pid?1:-1) }
+function myColor(g){var s=mySeat(g);if(s<0||!g.g)return 0;return s===g.g.blackSeat?BLACK:WHITE}
+
+/* ================= 방장: 규칙 집행 ================= */
+function newGame(blackSeat){
+  return {moves:[],blackSeat:blackSeat,over:null,undo:null,undoLeft:[3,3],rematch:[false,false]};
+}
+function hostApply(ev){
+  if(!G||!ev||!ev.pid)return;
+  if(ev.pid!==S.pid) seen[ev.pid]=now();
+
+  if(ev.t==='join'){
+    var nm=clean(ev.name);
+    if(G.p[1]&&G.p[1].pid===ev.pid){                 // 이미 앉아 있다 — 이름이 그대로면 조용히 넘어간다
+      if(G.p[1].name===nm)return;                    // (join은 4초마다 오는 생존 신호도 겸한다)
+      G.p[1].name=nm;
+    }
+    else if(G.p[0]&&G.p[0].pid===ev.pid){ if(G.p[0].name===nm)return; G.p[0].name=nm; }
+    else if(!G.p[1]){ G.p[1]={pid:ev.pid,name:nm}; if(G.phase==='wait')G.phase='ready'; }
+    else return;                                     // 정원 2명 — 세 번째는 무시한다
+    return push(true);
+  }
+  if(ev.t==='hb') return;
+  var seat=(G.p[0]&&G.p[0].pid===ev.pid)?0:((G.p[1]&&G.p[1].pid===ev.pid)?1:-1);
+  if(seat<0)return;
+
+  if(ev.t==='leave'){ if(seat===1){G.p[1]=null;G.phase='wait';G.g=newGame(G.g.blackSeat);delete seen[ev.pid]} return push(true) }
+  if(ev.t==='start'){ if(seat===0&&G.phase==='ready'){G.phase='play';G.g=newGame(G.g.blackSeat)} return push(true) }
+  if(ev.t==='move')   return hostMove(seat,ev.cell);
+  if(ev.t==='resign'){ if(G.phase==='play'&&!G.g.over){ G.g.over={reason:'resign',win:1-seat}; G.sc[1-seat]++; G.phase='over' } return push(true) }
+  if(ev.t==='drawEnd'){ if(G.phase==='play'&&!G.g.over){ G.g.over={reason:'agree',win:-1}; G.phase='over' } return push(true) }
+  if(ev.t==='undo'){
+    var g=G.g;
+    if(G.phase!=='play'||g.over||g.undo||!g.moves.length||g.undoLeft[seat]<=0)return;
+    g.undo={by:seat}; return push(true);
+  }
+  if(ev.t==='undoCancel'){ if(G.g.undo&&G.g.undo.by===seat){G.g.undo=null;push(true)} return }
+  if(ev.t==='undoAns'){
+    var g2=G.g;
+    if(!g2.undo||g2.undo.by===seat)return;
+    if(ev.ok&&g2.moves.length){ g2.moves.pop(); g2.undoLeft[g2.undo.by]--; }
+    g2.undo=null; return push(true);
+  }
+  if(ev.t==='rematch'){
+    if(G.phase!=='over')return;
+    G.g.rematch[seat]=true;
+    if(G.g.rematch[0]&&G.g.rematch[1]){ G.g=newGame(1-G.g.blackSeat); G.phase='play' }
+    return push(true);
+  }
+}
+function hostMove(seat,cell){
+  var g=G.g;
+  if(G.phase!=='play'||g.over||g.undo)return;
+  if(typeof cell!=='number'||cell<0||cell>=R.SIZE)return;
+  var c=turnColor(g);
+  if(seatOfColor(g,c)!==seat)return;                 // 차례 위반
+  var b=boardOf(g.moves);
+  if(b[cell]!==EMPTY)return;                         // 중복 착수
+  var x=cell%N, y=(cell/N)|0;
+  if(c===BLACK && R.forbid(b,x,y))return;            // 금수는 방장이 최종 거부한다
+  g.moves.push(cell);
+  b[cell]=c;
+  var L=R.winLine(b,x,y,c);
+  if(L){ g.over={reason:'five',win:seat,line:L}; G.sc[seat]++; G.phase='over'; return push(true) }
+  if(g.moves.length>=R.SIZE){ g.over={reason:'draw',win:-1}; G.phase='over'; return push(true) }
+  if(turnColor(g)===BLACK && !anyLegalBlack(boardOf(g.moves))){
+    g.over={reason:'noMove',win:-1}; G.phase='over'; return push(true);   // 흑이 둘 곳이 전부 금수
+  }
+  push(true);
+}
+function anyLegalBlack(b){
+  for(var y=0;y<N;y++)for(var x=0;x<N;x++){
+    if(b[R.idx(x,y)]===EMPTY && !R.forbid(b,x,y))return true;
+  }
+  return false;
+}
+function push(force){
+  if(!S.isHost||!G)return;
+  G.ts=now(); G.seq=(G.seq||0)+1;
+  NET.pub(tState(),G,true);
+  render();
+}
+
+/* ================= 이벤트 발신 ================= */
+function send(o){ o.pid=S.pid; NET.pub(tEv(),o,false); }
+function act(o){                     // 방장은 자기 이벤트를 그대로 자기 손으로 처리한다
+  if(S.isHost){ o.pid=S.pid; hostApply(o) } else send(o);
+}
+
+/* ================= 방 만들기 / 참가 ================= */
+function connect(){
+  return NET.connect(function(st){ S.net=st; paintChip() });
+}
+function createRoom(){
+  S.err='';S.isHost=true;S.code=rid(6);
+  G={p:[{pid:S.pid,name:S.name},null],phase:'wait',sc:[0,0],g:newGame(0),ts:now(),seq:0};
+  S.screen='lobby';render();
+  connect().then(function(){
+    NET.sub(tEv(),function(m){ hostApply(m) });
+    push(true);
+    if(hostTimer)clearInterval(hostTimer);
+    hostTimer=setInterval(function(){ push() },3000);      // 살아있음 신호 겸 상태 재발행
+  })['catch'](function(){ S.err='브로커에 붙지 못했습니다. 잠시 뒤 다시 시도해 주세요.';render() });
+  try{location.hash=S.code}catch(e){}
+}
+function joinRoom(code){
+  code=String(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+  if(code.length<4){S.err='방 코드를 확인해 주세요.';render();return}
+  S.err='';S.isHost=false;S.code=code;S.screen='lobby';S.hostSeen=0;G=null;render();
+  connect().then(function(){
+    NET.sub(tState(),function(m){
+      if(!m||!m.p)return;
+      G=m; S.hostSeen=now();
+      S.err=(G.p[1]&&G.p[1].pid!==S.pid)?'방이 가득 찼습니다 (2명 정원).':'';
+      render();
+    });
+    send({t:'join',name:S.name});
+    if(hbTimer)clearInterval(hbTimer);
+    hbTimer=setInterval(function(){ send({t:'hb'}); send({t:'join',name:S.name}) },4000);
+  })['catch'](function(){ S.err='브로커에 붙지 못했습니다. 잠시 뒤 다시 시도해 주세요.';render() });
+  try{location.hash=code}catch(e){}
+}
+function leaveRoom(){
+  act({t:'leave'});
+  if(hostTimer){clearInterval(hostTimer);hostTimer=null}
+  if(hbTimer){clearInterval(hbTimer);hbTimer=null}
+  try{NET.unsub(tState());NET.unsub(tEv())}catch(e){}
+  if(S.isHost){ NET.pub(tState(),null,true) }      // retain 비우기 — 유령 방이 남지 않게
+  G=null;S.code='';S.isHost=false;S.screen='home';S.ghost=-1;S.pend=null;
+  try{location.hash=''}catch(e){}
+  render();
+}
+
+/* ================= 상대 생존 판단 ================= */
+/* 몰수패는 넣지 않는다(공용 브로커가 주기적으로 끊는다). 대신 상황을 알리고
+   빠져나올 길을 연다 — 억울한 패배를 안 만드는 것과, 못 빠져나오게 가두는 건 다른 문제다 */
+function oppSilence(){
+  if(!G)return 0;
+  if(S.isHost){ var o=G.p[1]; if(!o)return 0; var t=seen[o.pid]||0; return t?now()-t:0 }
+  return S.hostSeen?now()-S.hostSeen:0;
+}
+function oppState(){ var ms=oppSilence(); return ms>40000?'gone':(ms>15000?'weak':'ok') }
+
+/* ================= 렌더 ================= */
+function h(s){return s}
+function render(){
+  lastKey='';
+  var v=S.screen;
+  if(v==='home')      app.innerHTML=viewHome();
+  else if(v==='lobby')app.innerHTML=viewLobby();
+  else                app.innerHTML=G&&G.g?viewGame():viewLobby();
+  if(S.sheet) app.insertAdjacentHTML('beforeend',viewSheet());
+  bind();
+  if(v==='game') drawBoard();
+}
+function topBar(extra){
+  return '<div class="top">'+
+    '<a class="chip" href="../../index.html" aria-label="게임 허브로 돌아가기">← 허브</a>'+
+    (extra||'')+
+    '<div class="sp"></div>'+
+    '<button class="chip" data-a="rule">규칙</button>'+
+    '<button class="chip" data-a="ver" id="verchip">v'+VERSION+'</button>'+
+  '</div>';
+}
+function netChip(){
+  var m={on:['on','연결됨'],off:['off','재연결 중…'],re:['off','재연결 중…'],dead:['dead','연결 실패'],idle:['','대기']};
+  var k=m[S.net]||m.idle;
+  return '<span class="chip '+k[0]+'" id="netchip">● '+k[1]+'</span>';
+}
+function paintChip(){
+  var el=document.getElementById('netchip');
+  if(el)el.outerHTML=netChip();
+}
+
+function viewHome(){
+  return topBar()+
+  '<h1>오목<span class="badge">렌주룰</span></h1>'+
+  '<p class="sub">방 코드 하나로, 친구와 단둘이 두는 15줄 오목.</p>'+
+  '<div class="card">'+
+    '<p class="lbl">닉네임</p>'+
+    '<input id="nm" maxlength="8" placeholder="최대 8자" value="'+esc(S.name)+'">'+
+  '</div>'+
+  '<div class="card">'+
+    '<p class="lbl">새 방 만들기</p>'+
+    '<button class="btn pri" data-a="create" style="width:100%">방 만들고 코드 받기</button>'+
+    '<p class="lbl" style="margin:16px 0 6px">코드로 참가하기</p>'+
+    '<div class="row">'+
+      '<input id="cd" maxlength="6" placeholder="예: K7M2QX" style="flex:2" value="'+esc(S.code)+'">'+
+      '<button class="btn" data-a="join" style="flex:1">참가</button>'+
+    '</div>'+
+    '<div class="err">'+esc(S.err)+'</div>'+
+  '</div>'+
+  '<p class="hint">흑에게는 삼삼·사사·장목 금수가 있습니다. 못 두는 자리는 판 위에 '+
+  '<span class="x">✕</span>로 미리 표시되고, 눌러보면 이유를 알려줍니다.</p>';
+}
+
+function viewLobby(){
+  var waiting=!G||G.phase==='wait';
+  var other=G&&G.p[1]?G.p[1]:null;
+  if(G&&!S.isHost) other=G.p[0];
+  return topBar(netChip())+
+  '<h1>대기실</h1>'+
+  '<div class="card" style="text-align:center">'+
+    '<p class="lbl">방 코드</p>'+
+    '<div style="font-size:36px;font-weight:900;letter-spacing:5px;color:var(--pt)">'+esc(S.code)+'</div>'+
+    '<div class="acts"><button class="btn sm" data-a="copy">'+(S.copied?'복사됨 ✓':'초대 링크 복사')+'</button></div>'+
+  '</div>'+
+  '<div class="card">'+
+    (other?('<p class="lbl">상대</p><div style="font-weight:700;font-size:16px">'+esc(other.name)+' 님이 들어왔습니다</div>')
+          :('<p class="lbl">상대를 기다리는 중…</p><div class="hint">코드나 링크를 친구에게 보내세요.</div>'))+
+    '<div class="err">'+esc(S.err)+'</div>'+
+    (S.isHost
+      ? '<div class="acts"><button class="btn pri" data-a="start"'+(other?'':' disabled')+'>대국 시작</button>'+
+        '<button class="btn" data-a="leave">방 닫기</button></div>'
+      : '<div class="acts"><button class="btn" data-a="leave">나가기</button></div>')+
+  '</div>'+
+  '<p class="hint">먼저 두는 쪽이 흑입니다. 한 판 끝나면 다음 판은 색이 바뀝니다.</p>';
+}
+
+function viewGame(){
+  var g=G.g, me=mySeat(G), c=turnColor(g), over=g.over;
+  var myTurn=!over&&seatOfColor(g,c)===me;
+  var os=oppState();
+  var pl=[0,1].map(function(s){
+    var p=G.p[s], isB=(s===g.blackSeat);
+    var st=over?'':(seatOfColor(g,c)===s?'차례':'대기');
+    if(s!==me){ if(os==='gone')st='응답 없음'; else if(os==='weak')st='연결 불안정' }
+    var cls=(!over&&seatOfColor(g,c)===s)?' turn':'';
+    var scls=(s!==me&&os==='gone')?' bad':((s!==me&&os==='weak')?' warn':'');
+    return '<div class="pl'+cls+'"><span class="dot '+(isB?'b':'w')+'"></span>'+
+      '<div style="min-width:0"><div class="pnm">'+esc(p?p.name:'—')+(s===me?' (나)':'')+'</div>'+
+      '<div class="pst'+scls+'">'+(isB?'흑':'백')+(st?' · '+st:'')+'</div></div>'+
+      '<div class="sp" style="flex:1"></div><div class="sc">'+G.sc[s]+'</div></div>';
+  }).join('');
+
+  var msg;
+  if(over){
+    msg=over.win<0?'무승부입니다':(over.win===me?'<span class="mine">이겼습니다 🎉</span>':'졌습니다');
+    if(over.reason==='resign')msg+=' (기권)';
+    if(over.reason==='agree')msg+=' (합의)';
+    if(over.reason==='noMove')msg=' 흑이 둘 곳이 모두 금수 — 무승부';
+  }else if(g.undo){
+    msg=(g.undo.by===me)?'무르기를 요청했습니다. 상대 응답 대기…':'상대가 무르기를 요청했습니다';
+  }else{
+    msg=myTurn?'<span class="mine">내 차례</span> ('+(myColor(G)===BLACK?'흑':'백')+')':'상대 차례';
+  }
+
+  var bar='';
+  if(!over&&!g.undo){
+    var gx=S.ghost>=0?(' '+cName(S.ghost%N,(S.ghost/N)|0)):'';
+    bar='<div class="bar"><div class="turnmsg">'+msg+'</div><div class="sp" style="flex:1"></div>'+
+        '<div class="coord">'+esc(gx)+'</div>'+
+        (S.ghost>=0&&myTurn?'<button class="btn sm pri" data-a="place">놓기</button>'+
+                            '<button class="btn sm" data-a="cancel">취소</button>':'')+
+        '</div>';
+  }else{
+    bar='<div class="bar"><div class="turnmsg">'+msg+'</div></div>';
+  }
+
+  var acts='';
+  if(over){
+    var mine=g.rematch[me], theirs=g.rematch[1-me];
+    acts='<div class="acts"><button class="btn pri" data-a="rematch"'+(mine?' disabled':'')+'>'+
+         (mine?(theirs?'시작합니다…':'상대 기다리는 중…'):'한 판 더 (색 교대)')+'</button>'+
+         '<button class="btn" data-a="leave">나가기</button></div>';
+  }else if(g.undo){
+    acts=(g.undo.by===me)
+      ? '<div class="acts"><button class="btn" data-a="undoCancel">요청 취소</button></div>'
+      : '<div class="acts"><button class="btn pri" data-a="undoYes">무르기 허용</button>'+
+        '<button class="btn" data-a="undoNo">거절</button></div>';
+  }else{
+    acts='<div class="acts">'+
+      '<button class="btn sm" data-a="undo"'+((g.moves.length&&g.undoLeft[me]>0)?'':' disabled')+'>무르기 ('+g.undoLeft[me]+')</button>'+
+      '<button class="btn sm dan" data-a="resign">기권</button></div>';
+  }
+
+  var note='';
+  if(os==='gone'&&!over){
+    note='<div class="note bad"><b>상대가 나간 것 같습니다.</b><br>'+
+      '연결이 40초 넘게 없습니다. 돌아오면 그대로 이어집니다.'+
+      '<div class="acts"><button class="btn sm" data-a="drawEnd">무승부로 종료</button>'+
+      '<button class="btn sm" data-a="leave">방 나가기</button></div></div>';
+  }else if(os==='weak'&&!over){
+    note='<div class="note">상대 연결이 불안정합니다…</div>';
+  }
+  if(S.pend&&!over) note='<div class="note">수를 보내는 중…</div>'+note;
+  if(S.msg) note='<div class="note">'+esc(S.msg)+'</div>'+note;
+
+  return topBar(netChip())+
+    '<div class="players">'+pl+'</div>'+
+    '<div class="bwrap"><canvas id="bd" width="600" height="600" aria-label="오목판"></canvas></div>'+
+    bar+acts+note;
+}
+
+function viewSheet(){
+  var inner;
+  if(S.sheet==='ver'){
+    inner='<h3>버전 기록</h3>'+CHANGELOG.map(function(e){
+      return '<div class="vlog"><div class="v">v'+e.v+'</div><ul>'+
+        e.t.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul></div>';
+    }).join('');
+  }else{
+    inner='<h3>렌주룰 한눈에</h3><dl class="rule">'+
+    '<dt>이기는 법</dt><dd>가로·세로·대각선으로 5개를 먼저 잇습니다.</dd>'+
+    '<dt>흑(선공)에게만 있는 제한 — 금수</dt><dd>흑은 <b>정확히 5목</b>일 때만 이깁니다. 아래 세 가지는 둘 수 없습니다.</dd>'+
+    '<dt><span class="x">✕</span> 삼삼</dt><dd>한 수로 열린 삼이 두 개 동시에 생기는 자리.</dd>'+
+    '<dt><span class="x">✕</span> 사사</dt><dd>한 수로 사가 두 개 동시에 생기는 자리.</dd>'+
+    '<dt><span class="x">✕</span> 장목</dt><dd>여섯 목 이상이 되는 자리. 흑은 6목으로 이길 수 없습니다.</dd>'+
+    '<dt>다만 5목이 우선</dt><dd>그 수로 5목이 완성되면 삼삼이어도 <b>흑의 승리</b>입니다.</dd>'+
+    '<dt>백(후공)</dt><dd>제한이 없습니다. 6목 이상으로도 이깁니다.</dd>'+
+    '<dt>돌 놓기</dt><dd>한 번 탭하면 미리보기, 다시 탭하거나 <b>놓기</b>를 눌러야 확정됩니다.</dd>'+
+    '<dt>공평하게</dt><dd>흑이 유리하므로 판마다 선후공을 바꿉니다.</dd>'+
+    '</dl>';
+  }
+  return '<div class="sheet"><div class="inner">'+inner+
+    '<button class="btn" data-a="closeSheet" style="width:100%;margin-top:6px">닫기</button></div></div>';
+}
+
+/* ================= 판 그리기 ================= */
+var fMapCache={key:'',map:null};
+function forbidMap(g){
+  var key=g.moves.join(',');
+  if(fMapCache.key===key)return fMapCache.map;
+  var m=(turnColor(g)===BLACK&&!g.over)?R.forbiddenMap(boardOf(g.moves)):null;
+  fMapCache={key:key,map:m};
+  return m;
+}
+function drawBoard(){
+  var cv=document.getElementById('bd'); if(!cv||!G)return;
+  var W=cv.clientWidth||340, dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(W*dpr); cv.height=Math.round(W*dpr);
+  cv.style.height=W+'px';
+  var ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  var pad=W*0.052, step=(W-pad*2)/(N-1), r=step*0.44;
+  cv._pad=pad; cv._step=step;
+
+  ctx.clearRect(0,0,W,W);
+  ctx.strokeStyle='#4a331c'; ctx.lineWidth=Math.max(.6,step*0.035);
+  for(var i=0;i<N;i++){
+    var p=pad+step*i;
+    ctx.beginPath();ctx.moveTo(pad,p);ctx.lineTo(W-pad,p);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(p,pad);ctx.lineTo(p,W-pad);ctx.stroke();
+  }
+  ctx.fillStyle='#4a331c';
+  [[3,3],[11,3],[3,11],[11,11],[7,7]].forEach(function(s){
+    ctx.beginPath();ctx.arc(pad+step*s[0],pad+step*s[1],step*0.11,0,7);ctx.fill();
+  });
+
+  var g=G.g, b=boardOf(g.moves);
+  var fm=forbidMap(g), meC=myColor(G), myTurn=!g.over&&!g.undo&&seatOfColor(g,turnColor(g))===mySeat(G);
+
+  /* 금수 표시 — 흑을 쥔 사람에게만, 자기 차례일 때 보여준다 */
+  if(fm&&meC===BLACK&&myTurn){
+    ctx.strokeStyle='rgba(200,26,44,.85)'; ctx.lineWidth=Math.max(1.6,step*0.09); ctx.lineCap='round';
+    for(var k=0;k<fm.length;k++){
+      if(!fm[k])continue;
+      var fx=pad+step*(k%N), fy=pad+step*((k/N)|0), d=step*0.24;
+      ctx.beginPath();ctx.moveTo(fx-d,fy-d);ctx.lineTo(fx+d,fy+d);
+      ctx.moveTo(fx+d,fy-d);ctx.lineTo(fx-d,fy+d);ctx.stroke();
+    }
+  }
+
+  for(var c2=0;c2<b.length;c2++){
+    if(b[c2]===EMPTY)continue;
+    stone(ctx,pad+step*(c2%N),pad+step*((c2/N)|0),r,b[c2]===BLACK);
+  }
+  /* 마지막 수 표식 — 상대가 어디에 뒀는지 즉시 보여야 한다 */
+  if(g.moves.length){
+    var last=g.moves[g.moves.length-1], lb=(g.moves.length%2===1);
+    ctx.strokeStyle=lb?'#00e5ff':'#e0342f'; ctx.lineWidth=Math.max(1.6,step*0.075);
+    ctx.beginPath();ctx.arc(pad+step*(last%N),pad+step*((last/N)|0),r*0.42,0,7);ctx.stroke();
+  }
+  /* 승리 라인 */
+  if(g.over&&g.over.line){
+    ctx.strokeStyle=REDUCED?'#1b8f4a':'rgba(0,229,255,.95)';
+    ctx.lineWidth=Math.max(2,step*0.13); ctx.lineCap='round';
+    var L=g.over.line, a=L[0], z=L[L.length-1];
+    ctx.beginPath();
+    ctx.moveTo(pad+step*(a%N),pad+step*((a/N)|0));
+    ctx.lineTo(pad+step*(z%N),pad+step*((z/N)|0));
+    ctx.stroke();
+  }
+  /* 미리보기 돌 — 반투명 */
+  if(S.ghost>=0&&myTurn&&b[S.ghost]===EMPTY){
+    ctx.globalAlpha=.5;
+    stone(ctx,pad+step*(S.ghost%N),pad+step*((S.ghost/N)|0),r,meC===BLACK);
+    ctx.globalAlpha=1;
+    ctx.strokeStyle='#00e5ff';ctx.lineWidth=Math.max(1.5,step*0.07);
+    ctx.beginPath();ctx.arc(pad+step*(S.ghost%N),pad+step*((S.ghost/N)|0),r*1.28,0,7);ctx.stroke();
+  }
+}
+function stone(ctx,cx,cy,r,black){
+  var gr=ctx.createRadialGradient(cx-r*.35,cy-r*.4,r*.1,cx,cy,r);
+  if(black){gr.addColorStop(0,'#5a5f75');gr.addColorStop(.45,'#22242e');gr.addColorStop(1,'#0b0c11')}
+  else{gr.addColorStop(0,'#ffffff');gr.addColorStop(.55,'#eef0f7');gr.addColorStop(1,'#b9bed0')}
+  ctx.fillStyle=gr;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
+  ctx.strokeStyle=black?'rgba(0,0,0,.55)':'rgba(80,86,110,.55)';ctx.lineWidth=Math.max(.5,r*.06);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();
+}
+
+/* ================= 입력 ================= */
+function hitCell(cv,ev){
+  var rc=cv.getBoundingClientRect();
+  var t=(ev.touches&&ev.touches[0])||(ev.changedTouches&&ev.changedTouches[0])||ev;
+  var px=t.clientX-rc.left, py=t.clientY-rc.top;
+  var pad=cv._pad, step=cv._step;
+  var x=Math.round((px-pad)/step), y=Math.round((py-pad)/step);
+  if(x<0||x>=N||y<0||y>=N)return -1;
+  if(Math.abs(px-(pad+step*x))>step*0.62||Math.abs(py-(pad+step*y))>step*0.62)return -1;
+  return R.idx(x,y);
+}
+function tapBoard(ev){
+  if(!G||G.phase!=='play')return;
+  var g=G.g; if(g.over||g.undo)return;
+  var cv=ev.currentTarget, cell=hitCell(cv,ev);
+  if(cell<0)return;
+  var me=mySeat(G), c=turnColor(g);
+  if(seatOfColor(g,c)!==me){ toast('상대 차례입니다'); return }
+  var b=boardOf(g.moves);
+  if(b[cell]!==EMPTY){ toast('이미 돌이 있는 자리입니다'); return }
+  if(c===BLACK){
+    var why=R.forbid(b,cell%N,(cell/N)|0);
+    if(why){ toast(FORBID_MSG[why]||'흑이 둘 수 없는 자리입니다'); S.ghost=-1; render(); return }
+  }
+  if(S.ghost===cell){ commit(cell); return }   // 같은 자리 두 번째 탭 = 확정
+  S.ghost=cell; render();
+}
+function commit(cell){
+  if(cell<0)return;
+  act({t:'move',cell:cell});
+  S.ghost=-1;
+  /* 공용 브로커는 아무 때나 끊긴다. 손님의 착수가 그 순간에 걸리면 소리 없이 사라지고
+     "분명 뒀는데 안 놓아졌다"가 된다. 판에 나타날 때까지 다시 보낸다. */
+  if(!S.isHost){ S.pend={cell:cell,t:now(),n:0}; render() }
+}
+function pumpPend(){
+  if(!S.pend||!G||!G.g)return;
+  if(G.g.moves.indexOf(S.pend.cell)>=0){ S.pend=null; return }       // 도착했다
+  var age=now()-S.pend.t;
+  if(age>12000){ S.pend=null; toast('수를 보내지 못했습니다. 연결을 확인하고 다시 놓아 주세요.'); return }
+  if(age>1200*(S.pend.n+1)){ S.pend.n++; send({t:'move',cell:S.pend.cell}) }
+}
+var toastT=null;
+function toast(m){
+  S.msg=m; render();
+  if(toastT)clearTimeout(toastT);
+  toastT=setTimeout(function(){S.msg='';render()},2600);
+}
+
+/* ================= 바인딩 ================= */
+function bind(){
+  var nm=document.getElementById('nm');
+  if(nm)nm.addEventListener('input',function(){S.name=nm.value});
+  var cd=document.getElementById('cd');
+  if(cd)cd.addEventListener('input',function(){S.code=cd.value.toUpperCase()});
+  var cv=document.getElementById('bd');
+  if(cv)cv.addEventListener('click',tapBoard);
+
+  var sh=app.querySelector('.sheet');
+  if(sh)sh.addEventListener('click',function(ev){ if(ev.target===sh)onAct('closeSheet') });
+  Array.prototype.forEach.call(app.querySelectorAll('button[data-a],a[data-a]'),function(el){
+    el.addEventListener('click',function(ev){ ev.stopPropagation(); onAct(el.getAttribute('data-a')) });
+  });
+}
+function onAct(a){
+  if(a==='ver'){S.sheet='ver';render();return}
+  if(a==='rule'){S.sheet='rule';render();return}
+  if(a==='closeSheet'){S.sheet='';render();return}
+  if(a==='create'){ S.name=clean(S.name||(document.getElementById('nm')||{}).value); createRoom(); return }
+  if(a==='join'){ S.name=clean(S.name||(document.getElementById('nm')||{}).value); joinRoom(S.code); return }
+  if(a==='copy'){ copyInvite(); return }
+  if(a==='leave'){ leaveRoom(); return }
+  if(a==='start'){ act({t:'start'}); return }
+  if(a==='place'){ commit(S.ghost); return }
+  if(a==='cancel'){ S.ghost=-1; render(); return }
+  if(a==='undo'){ act({t:'undo'}); return }
+  if(a==='undoCancel'){ act({t:'undoCancel'}); return }
+  if(a==='undoYes'){ act({t:'undoAns',ok:true}); return }
+  if(a==='undoNo'){ act({t:'undoAns',ok:false}); return }
+  if(a==='rematch'){ act({t:'rematch'}); return }
+  if(a==='resign'){ if(confirm('기권하시겠습니까? 이 판은 패배로 기록됩니다.')) act({t:'resign'}); return }
+  if(a==='drawEnd'){ if(confirm('이 판을 무승부로 끝낼까요?')) act({t:'drawEnd'}); return }
+}
+function copyInvite(){
+  var t=inviteLink();
+  var done=function(){S.copied=true;render();setTimeout(function(){S.copied=false;render()},1800)};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done)['catch'](function(){prompt('링크를 복사하세요',t)});
+  }else{ prompt('링크를 복사하세요',t) }
+}
+
+/* 1초 타이머가 매번 DOM을 갈아엎으면 화면이 깜빡이고 탭이 씹힌다.
+   실제로 달라진 게 있을 때만 다시 그린다. */
+var lastKey='';
+function tick(){
+  pumpPend();
+  var k=[S.screen,G?G.seq:0,G?G.phase:'',oppState(),S.ghost,S.msg,S.sheet,S.copied,S.err,S.net,S.pend?1:0].join('|');
+  if(k===lastKey)return;
+  lastKey=k; render();
+}
+/* ================= 구동 ================= */
+(function boot(){
+  var hash=(location.hash||'').replace('#','').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(hash.length>=4)S.code=hash.slice(0,6);
+  render();
+  window.addEventListener('resize',function(){ if(S.screen==='game')drawBoard() });
+  uiTimer=setInterval(function(){
+    if(!G)return;
+    var want=(G.phase==='play'||G.phase==='over')?'game':'lobby';
+    if(S.screen!=='home'&&S.screen!==want){S.screen=want;S.ghost=-1}
+    if(S.screen!=='home')tick();
+  },1000);
+  window.addEventListener('beforeunload',function(){ try{act({t:'leave'})}catch(e){} });
+})();
+</script>
+</body>
+</html>
