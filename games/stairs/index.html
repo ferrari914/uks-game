@@ -179,8 +179,13 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    ========================================================================= */
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.0.0';
+var VERSION='1.1.0';
 var CHANGELOG=[
+ {v:'1.1.0',t:['게임 화면을 입체적으로 다시 그렸다 — 위로 갈수록 계단이 작아지는 원근',
+               '멀리 있는 계단은 배경색으로 바래게 해 높이가 실감나도록',
+               '별이 층수에 따라 다른 속도로 흐르는 배경 (그림 파일은 쓰지 않는다)',
+               '한 칸 오를 때 캐릭터가 튀어오르고 착지에서 눌리는 동작',
+               '벽에 부딪히거나 힘이 다하면 파편이 흩어지는 연출']},
  {v:'1.0.0',t:['무한의 계단 첫 공개 — 버튼 2개(오르기 / 방향 전환)로 계단을 무한히 오른다',
                '싱글플레이: 최고 층수 기록과 명예의 전당(전체 순위표)',
                '멀티플레이: 2~8인이 같은 계단을 동시에 올라 한 명 남을 때까지 경쟁',
@@ -430,11 +435,19 @@ function makeGame(seed){
 /* =========================================================================
    렌더러 (캔버스 2D)
    플레이어를 화면 62% 높이에 고정하고 카메라가 따라 오른다.
+
+   깊이는 세 가지로 만든다 — 이미지 파일은 한 장도 쓰지 않는다
+   (file:// 로 열려야 하고, 게임 파일은 index.html 하나로 유지한다).
+     ① 원근  : 위로 갈수록 계단이 작아지고 간격이 좁아진다
+     ② 조명  : 왼쪽 위 광원 하나. 윗면이 가장 밝고 앞면이 어둡다
+     ③ 공기원근 : 멀수록 배경색 쪽으로 바래진다 — 이게 깊이감의 절반이다
    ========================================================================= */
 function makeView(cv,G){
   var ctx=cv.getContext('2d'), dpr=1, W=0, H=0;
   var camX=0, camY=0, first=true;
-  var sw=46, sh=34;                    // 칸 간격 (가로/세로)
+  var sw=46, sh=34;
+  var PERSP=0.055;                 // 한 칸 멀어질 때마다 줄어드는 비율
+  var stars=null, parts=[], lastT=0, stepT=0, seenFloor=-1, deadSpawned=false;
 
   function resize(){
     dpr=Math.min(2,window.devicePixelRatio||1);
@@ -446,66 +459,125 @@ function makeView(cv,G){
   }
   window.addEventListener('resize',resize);
 
+  /* ---- 색 ---- */
+  function rgb(h){return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]}
+  var C_TOP=rgb('#3b466e'), C_LIP=rgb('#5b6ba6'), C_FRONT=rgb('#161a2b'),
+      C_EDGE=rgb('#2a3252'), C_FOG=rgb('#0b0e1a');
+  function mix(a,b,t){
+    return 'rgb('+((a[0]+(b[0]-a[0])*t)|0)+','+((a[1]+(b[1]-a[1])*t)|0)+','+((a[2]+(b[2]-a[2])*t)|0)+')';
+  }
+
+  /* ---- 원근 ---- */
+  /* 가까운 쪽 배율에 상한을 둔다. 안 두면 지나온 계단이 화면 아래를
+     뒤덮어 정작 봐야 할 위쪽이 안 보인다. */
+  function scaleAt(r){var v=1+r*PERSP; if(v<0.18)v=0.18; var sc=1/v; return sc>1.42?1.42:sc}
+  /* 칸 간격도 같이 줄어야 하므로 scale 을 적분한 값이 화면 높이다.
+     ∫ 1/(1+r·k) dr = ln(1+r·k)/k — 닫힌 식이라 카메라가 소수여도 매끄럽다. */
+  function yOff(r){var v=1+r*PERSP; if(v<0.18)v=0.18; return (sh/PERSP)*Math.log(v)}
+
+  /* ---- 배경 ---- */
+  function mkStars(){
+    var rnd=mulberry32(20260828), a=[];
+    for(var i=0;i<80;i++)a.push({x:rnd(),y:rnd(),s:rnd()*1.7+0.5,d:0.10+rnd()*0.55});
+    stars=a;
+  }
   function bg(){
     var g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#0d1020'); g.addColorStop(1,'#07080f');
+    g.addColorStop(0,'#0e1224'); g.addColorStop(0.55,'#0a0d1a'); g.addColorStop(1,'#07080f');
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    /* 높이감을 주는 배경 눈금 — 카메라를 따라 흐른다 */
-    ctx.strokeStyle='rgba(38,43,64,.55)'; ctx.lineWidth=1;
+    if(!stars)mkStars();
+    /* 시차 — 층마다 다른 속도로 흐른다. 멀리 있는 것일수록 천천히 */
+    for(var i=0;i<stars.length;i++){
+      var st=stars[i];
+      var y=((st.y*H + camY*sh*st.d) % H + H) % H;
+      ctx.fillStyle='rgba(150,175,225,'+(0.10+st.d*0.30).toFixed(2)+')';
+      ctx.fillRect(st.x*W, y, st.s, st.s);
+    }
+    /* 높이 눈금 — 얼마나 빨리 오르는지 몸으로 느끼게 하는 유일한 단서 */
+    ctx.strokeStyle='rgba(48,56,86,.5)'; ctx.lineWidth=1;
     var span=sh*6, off=((camY*sh)%span+span)%span;
-    for(var y=off;y<H;y+=span){
-      ctx.beginPath(); ctx.moveTo(0,Math.round(y)+.5); ctx.lineTo(W,Math.round(y)+.5); ctx.stroke();
+    for(var y2=off;y2<H;y2+=span){
+      ctx.beginPath(); ctx.moveTo(0,Math.round(y2)+.5); ctx.lineTo(W,Math.round(y2)+.5); ctx.stroke();
     }
   }
-  /* 계단 한 칸. 윗면(밝음) + 앞면(어두움)으로 단차를 만든다.
-     블록 높이를 칸 간격에 맞춰 잘라야 계단이 "계단"으로 읽힌다 —
-     길게 그리면 옆 칸과 겹쳐서 덩어리로 보인다. */
-  function block(x,y){
-    var bw=sw*1.02, topH=Math.max(10,sh*0.38), bodyH=sh-topH+3;
-    var l=Math.round(x-bw/2), w=Math.round(bw);
-    ctx.fillStyle='#161927';                       // 앞면
+
+  /* ---- 계단 한 칸 ----
+     윗면(밝음) + 앞면(어두움)으로 단차를 만든다. 블록 높이를 칸 간격에 맞춰
+     잘라야 계단이 "계단"으로 읽힌다 — 길게 그리면 옆 칸과 겹쳐 덩어리가 된다. */
+  function block(x,y,sc,fog){
+    var bw=sw*1.02*sc, topH=Math.max(6,sh*0.38*sc), bodyH=Math.max(4,(sh-topH/sc*0.0+3)*sc);
+    var l=Math.round(x-bw/2), w=Math.max(2,Math.round(bw));
+    ctx.fillStyle=mix(C_FRONT,C_FOG,fog);                 // 앞면 (그늘)
     ctx.fillRect(l,y,w,bodyH);
-    ctx.fillStyle='#2c3352';                       // 윗면
+    ctx.fillStyle=mix(C_TOP,C_FOG,fog);                   // 윗면 (빛을 받는 면)
     ctx.fillRect(l,y-topH,w,topH);
-    ctx.fillStyle='rgba(0,229,255,.10)';           // 윗면 앞쪽 하이라이트
-    ctx.fillRect(l,y-2,w,2);
-    ctx.strokeStyle='#3a4166'; ctx.lineWidth=1;
-    ctx.strokeRect(l+.5,Math.round(y-topH)+.5,w-1,Math.round(topH+bodyH)-1);
+    ctx.fillStyle=mix(C_LIP,C_FOG,fog);                   // 앞쪽 모서리 하이라이트
+    ctx.fillRect(l,y-Math.max(1,2*sc),w,Math.max(1,2*sc));
+    if(sc>0.45){                                          // 가까울 때만 테두리 (멀면 노이즈)
+      ctx.strokeStyle=mix(C_EDGE,C_FOG,fog); ctx.lineWidth=1;
+      ctx.strokeRect(l+.5,Math.round(y-topH)+.5,w-1,Math.round(topH+bodyH)-1);
+    }
   }
-  function hero(x,y,facing,dead){
-    var s=sw*0.42, col=dead?'#5c637d':'#00e5ff';
+
+  /* ---- 캐릭터 ---- */
+  function hero(x,y,facing,dead,anim){
+    var s=sw*0.42, col=dead?'#5c637d':'#00e5ff', f=facing;
+    /* 한 칸 오를 때 살짝 튀어오르고 착지에서 눌린다. 110ms 안에 끝나야
+       초당 6회 연타를 따라온다 (한 칸 간격이 154ms). */
+    var hop=dead?0:Math.sin(anim*Math.PI), sq=1-0.16*hop, st=1+0.16*hop;
+    y-=hop*sh*0.22;
     ctx.save();
-    if(!dead&&!REDUCED){ctx.shadowColor='rgba(0,229,255,.5)';ctx.shadowBlur=16}
+    if(!dead&&!REDUCED){ctx.shadowColor='rgba(0,229,255,.45)';ctx.shadowBlur=16}
     ctx.fillStyle=col;
-    /* 몸 (어깨가 앞쪽으로 조금 나간다 — 방향이 실루엣으로도 읽히게).
-       좌표를 전부 facing 으로 뒤집어야 왼쪽을 볼 때 도형이 꼬이지 않는다. */
-    var f=facing;
-    ctx.beginPath();
-    ctx.moveTo(x-f*s*0.42,y);
-    ctx.lineTo(x-f*s*0.42,y-s*1.35);
-    ctx.lineTo(x+f*s*0.62,y-s*1.35);
-    ctx.lineTo(x+f*s*0.42,y-s*0.2);
-    ctx.lineTo(x+f*s*0.42,y);
+    ctx.beginPath();                                     // 몸 — 어깨가 앞으로 나간다
+    ctx.moveTo(x-f*s*0.42*sq,y);
+    ctx.lineTo(x-f*s*0.42*sq,y-s*1.35*st);
+    ctx.lineTo(x+f*s*0.62*sq,y-s*1.35*st);
+    ctx.lineTo(x+f*s*0.42*sq,y-s*0.2*st);
+    ctx.lineTo(x+f*s*0.42*sq,y);
     ctx.closePath(); ctx.fill();
-    /* 머리 — 몸과 확실히 띄운다 */
-    ctx.beginPath(); ctx.arc(x+facing*s*0.1,y-s*2.05,s*0.5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();                                     // 머리
+    ctx.arc(x+f*s*0.1,y-s*2.05*st,s*0.5*sq,0,Math.PI*2); ctx.fill();
     ctx.restore();
-    /* 바라보는 방향 — 머리 앞의 뾰족한 부리. 이걸 봐야 오르기/전환을 고른다 */
-    ctx.fillStyle=col;
+    ctx.fillStyle=col;                                   // 부리 — 바라보는 방향
     ctx.beginPath();
-    ctx.moveTo(x+facing*s*0.35,y-s*2.22);
-    ctx.lineTo(x+facing*s*1.15,y-s*2.02);
-    ctx.lineTo(x+facing*s*0.35,y-s*1.86);
+    ctx.moveTo(x+f*s*0.35,y-s*2.22*st);
+    ctx.lineTo(x+f*s*1.15,y-s*2.02*st);
+    ctx.lineTo(x+f*s*0.35,y-s*1.86*st);
     ctx.closePath(); ctx.fill();
-    /* 눈 */
-    ctx.fillStyle='#04202a';
-    ctx.beginPath(); ctx.arc(x+facing*s*0.28,y-s*2.12,s*0.11,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#04202a';                             // 눈
+    ctx.beginPath(); ctx.arc(x+f*s*0.28,y-s*2.12*st,s*0.11,0,Math.PI*2); ctx.fill();
+  }
+
+  /* ---- 죽을 때 파편 ---- */
+  function spawnParts(x,y){
+    if(REDUCED)return;
+    var rnd=mulberry32((G.floor*7919+13)>>>0);
+    for(var i=0;i<16;i++){
+      var a=rnd()*Math.PI*2, sp=(40+rnd()*150);
+      parts.push({x:x,y:y-sh*0.6,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-90,
+                  s:2+rnd()*3.5,life:0.55+rnd()*0.35,age:0});
+    }
+  }
+  function drawParts(dt){
+    for(var i=parts.length-1;i>=0;i--){
+      var p=parts[i];
+      p.age+=dt;
+      if(p.age>=p.life){parts.splice(i,1);continue}
+      p.vy+=520*dt; p.x+=p.vx*dt; p.y+=p.vy*dt;
+      ctx.fillStyle='rgba(0,229,255,'+(1-p.age/p.life).toFixed(2)+')';
+      ctx.fillRect(p.x,p.y,p.s,p.s);
+    }
   }
 
   return {
     resize:resize,
     draw:function(){
       if(!W||!H)resize();
+      var now=nowMs(), dt=lastT?Math.min(0.05,(now-lastT)/1000):0; lastT=now;
+      if(G.floor!==seenFloor){seenFloor=G.floor;stepT=now}
+      var anim=Math.min(1,(now-stepT)/110);
+
       var tx=G.xAt(G.floor), ty=G.floor;
       if(first){camX=tx;camY=ty;first=false}
       else{
@@ -515,15 +587,22 @@ function makeView(cv,G){
       }
       bg();
       var baseY=H*0.62, cx=W/2;
-      var lo=Math.max(0,G.floor-8), hi=G.floor+16;
+      var lo=Math.max(0,G.floor-9), hi=G.floor+22;
+      /* 먼 것부터 그려서 가까운 것이 덮게 한다 */
       for(var i=hi;i>=lo;i--){
-        var sx=cx+(G.xAt(i)-camX)*sw;
-        var sy=baseY-(i-camY)*sh;
-        if(sy<-60||sy>H+60)continue;
-        block(sx,sy);
+        var r=i-camY, sc=scaleAt(r);
+        var sy=baseY-yOff(r);
+        if(sy<-80||sy>H+80)continue;
+        var sx=cx+(G.xAt(i)-camX)*sw*sc;
+        var fog=Math.max(0,Math.min(0.82,(1-sc)*1.25));
+        block(sx,sy,sc,fog);
       }
-      var hx=cx+(G.xAt(G.floor)-camX)*sw, hy=baseY-(G.floor-camY)*sh;
-      hero(hx,hy,G.facing,G.dead);
+      var hr=G.floor-camY, hsc=scaleAt(hr);
+      var hx=cx+(G.xAt(G.floor)-camX)*sw*hsc, hy=baseY-yOff(hr);
+      hero(hx,hy,G.facing,G.dead,anim);
+      if(G.dead&&!deadSpawned){deadSpawned=true;spawnParts(hx,hy)}
+      if(!G.dead)deadSpawned=false;
+      if(parts.length)drawParts(dt);
       if(G.dead&&G.why==='wall'){
         ctx.font='700 '+Math.round(sw*0.62)+'px system-ui,sans-serif';
         ctx.textAlign='center'; ctx.textBaseline='middle';
