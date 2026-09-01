@@ -5,8 +5,15 @@
 "use strict";
 
 /* ===== 버전 기록 ===== */
-var VERSION='1.0.0';
+var VERSION='1.1.0';
 var CHANGELOG=[
+  { v:'1.1.0', t:[
+      '온라인 멀티 추가 — 한 방 2~8명, 순서대로 잇고 최후 1인이 승리',
+      '방 코드 5자로 참가 · 방장 브라우저가 판정과 진행을 맡는다',
+      '못 내면 체력 -15, 0이 되면 탈락하고 관전으로 넘어간다',
+      '단어마다 점수가 쌓여 탈락해도 순위가 남는다',
+      '멀티는 https에서만 됩니다 — 싱글은 그대로 동작합니다'
+  ]},
   { v:'1.0.0', t:[
       '첫 배포 — AI 기사와의 싱글 대전 (견습·기사·검성)',
       '내장 사전 168,802단어로 판정 (ENABLE + 현대어 보강 + 기초어)',
@@ -105,9 +112,11 @@ function josa(name, withB, withoutB){ return name + (hasBat(name)?withB:withoutB
 
 /* ===== 화면 조작 ===== */
 function $(id){ return document.getElementById(id); }
+/* 화면 전환. .screen 을 단 섹션을 전부 숨기고 하나만 보인다.
+   멀티가 화면을 더 붙여도 여기를 고칠 필요가 없다. */
 function show(id){
-  var ss=['home','battle','result'];
-  for(var i=0;i<ss.length;i++) $(ss[i]).hidden = (ss[i]!==id);
+  var ss=document.querySelectorAll('section.screen');
+  for(var i=0;i<ss.length;i++) ss[i].hidden = (ss[i].id!==id);
 }
 
 /* ===== 기록 (localStorage — 못 써도 게임은 그대로 돌아간다) ===== */
@@ -445,6 +454,21 @@ function wire(){
 /* ===== 시작 ===== */
 function init(){
   boot(); wire(); paintRec();
+  /* 멀티(multi.js)가 같은 사전·같은 규칙을 쓰도록 노출한다.
+     규칙을 두 벌 만들면 싱글과 멀티의 판정이 갈라진다. */
+  window.WB_RULES={
+    TUNE:TUNE, VERSION:VERSION,
+    has:function(w){ return WORDS.has(w) },
+    blocked:function(w){ return !!BLOCK[w] },
+    mean:function(w){ return MEAN[w]||'' },
+    judge:judge, needFrom:needFrom, damage:damage,
+    seedWord:function(){
+      var pool=CORE1['a'].concat(CORE1['s'],CORE1['t'],CORE1['b'],CORE1['c']);
+      return pool[(Math.random()*pool.length)|0];
+    },
+    show:show, $:$, josa:josa, openVer:openVer
+  };
+  if(window.WB_MULTI && window.WB_MULTI.init) window.WB_MULTI.init();
   $('loading').hidden=true;
   show('home');
 }

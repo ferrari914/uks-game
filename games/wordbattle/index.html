@@ -143,6 +143,36 @@ section[hidden]{display:none !important}
 .log .v{font-size:13px; font-weight:800}
 .log ul{margin:5px 0 0; padding-left:18px; color:var(--muted); font-size:13px; line-height:1.7}
 
+/* ===== 온라인 ===== */
+.tagline{font-size:11px; color:var(--muted); font-weight:400; margin-left:6px}
+.namerow{display:flex; align-items:center; gap:10px}
+.lbl{font-size:13px; color:var(--muted); min-width:32px}
+#nick, #joinCode{
+  flex:1; min-height:44px; padding:0 12px; font-size:15px;
+  background:#0d1020; border:1px solid var(--line); border-radius:11px; color:var(--text);
+}
+#nick:focus, #joinCode:focus{outline:none; border-color:var(--accent)}
+#joinCode{letter-spacing:3px; text-transform:uppercase; font-weight:700}
+.joinrow{display:flex; gap:8px; margin-top:8px}
+.joinrow .btn{flex:0 0 84px}
+
+.plist{display:flex; flex-direction:column; gap:7px}
+.plist.tight{gap:5px; margin:8px 0 4px}
+.prow{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:11px;
+      background:#0d1020; border:1px solid var(--line)}
+.prow.turn{border-color:var(--accent); background:rgba(0,229,255,.08)}
+.prow.dead{opacity:.42}
+.prow.me .pn{color:var(--accent)}
+.prow .pn{font-size:13px; font-weight:700; min-width:66px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.prow .phb{flex:1; height:9px; background:#080a15; border-radius:999px; overflow:hidden}
+.prow .phf{display:block; height:100%; background:linear-gradient(90deg,#00e5ff,#3ddc97); border-radius:999px; transition:width .3s}
+.prow.dead .phf{background:var(--bad)}
+.prow .pv{font-size:11px; color:var(--muted); min-width:62px; text-align:right; font-variant-numeric:tabular-nums}
+.prow .crown{font-size:13px}
+.whose{margin:2px 0 8px; font-size:13px; text-align:center; color:var(--muted); min-height:18px}
+.whose b{color:var(--accent)}
+.whose.mine{color:var(--accent); font-weight:700}
+
 @media (min-height:700px){
   .chain{height:230px}
 }
@@ -164,7 +194,7 @@ section[hidden]{display:none !important}
   </div>
 
   <!-- ===== 첫 화면 ===== -->
-  <section id="home" hidden>
+  <section id="home" class="screen" hidden>
     <div class="topbar">
       <div>
         <h1 class="title">영어 끝말잇기</h1>
@@ -198,6 +228,26 @@ section[hidden]{display:none !important}
     </div>
 
     <div class="card">
+      <h2>여럿이 겨루기 <span class="tagline">온라인 · 2~8명</span></h2>
+      <p class="sub" style="margin:-4px 0 10px">
+        한 방에 모여 순서대로 단어를 잇는다. 못 내면 체력이 깎이고, <b>최후 1인</b>이 이긴다.
+      </p>
+      <div class="namerow">
+        <label class="lbl" for="nick">이름</label>
+        <input id="nick" type="text" maxlength="8" placeholder="기사" aria-label="이름">
+      </div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn pri" id="mkRoom">방 만들기</button>
+      </div>
+      <div class="joinrow">
+        <input id="joinCode" type="text" maxlength="5" placeholder="방 코드"
+               autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="방 코드">
+        <button class="btn" id="joinRoom">참가</button>
+      </div>
+      <p class="msg" id="netMsg"></p>
+    </div>
+
+    <div class="card">
       <h2>규칙</h2>
       <ul class="rules">
         <li>앞 단어의 <b>마지막 글자</b>로 시작하는 영어 단어를 입력한다</li>
@@ -211,7 +261,7 @@ section[hidden]{display:none !important}
   </section>
 
   <!-- ===== 대전 화면 ===== -->
-  <section id="battle" hidden>
+  <section id="battle" class="screen" hidden>
     <div class="fighter">
       <span class="nm" id="aiName">기사</span>
       <span class="hpwrap"><span class="hpbar hp-ai" id="hpAi"></span></span>
@@ -245,7 +295,7 @@ section[hidden]{display:none !important}
   </section>
 
   <!-- ===== 결과 화면 ===== -->
-  <section id="result" hidden>
+  <section id="result" class="screen" hidden>
     <p class="verdict" id="verdict"></p>
     <p class="sub" id="verdictSub" style="text-align:center"></p>
 
@@ -268,6 +318,51 @@ section[hidden]{display:none !important}
       <button class="btn" id="toHome">처음으로</button>
     </div>
   </section>
+  <!-- ===== 대기실 ===== -->
+  <section id="lobby" class="screen" hidden>
+    <div class="topbar">
+      <div><h1 class="title">대기실</h1><p class="sub" id="lobbySub">참가자를 기다리는 중</p></div>
+      <button class="verbtn" id="roomCode" aria-label="방 코드 복사">-----</button>
+    </div>
+    <p class="sub" style="margin:-2px 0 10px">방 코드를 눌러 복사한 뒤 친구에게 보내세요. 2~8명.</p>
+    <div class="card"><h2>참가자 <span id="lobbyCnt">0</span>명</h2><div id="lobbyList" class="plist"></div></div>
+    <p class="msg" id="lobbyMsg"></p>
+    <div class="btnrow">
+      <button class="btn pri" id="startGame" hidden>시작</button>
+      <button class="btn" id="leaveLobby">나가기</button>
+    </div>
+  </section>
+
+  <!-- ===== 멀티 대전 ===== -->
+  <section id="mbattle" class="screen" hidden>
+    <div id="mPlayers" class="plist tight"></div>
+    <div class="chain" id="mChain"></div>
+    <div class="turnbar">
+      <span class="need" id="mNeed"></span>
+      <span class="timer" id="mTimer">15</span>
+    </div>
+    <p class="whose" id="mWhose"></p>
+    <div class="inputrow">
+      <input id="mWord" type="text" inputmode="latin" enterkeyhint="send"
+             autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
+             placeholder="영어 단어" aria-label="영어 단어 입력">
+      <button class="go" id="mSubmit">제출</button>
+    </div>
+    <p class="msg" id="mMsg"></p>
+    <div class="btnrow"><button class="btn" id="mLeave">나가기</button></div>
+  </section>
+
+  <!-- ===== 멀티 결과 ===== -->
+  <section id="mresult" class="screen" hidden>
+    <p class="verdict" id="mVerdict"></p>
+    <p class="sub" id="mVerdictSub" style="text-align:center"></p>
+    <div class="card"><h2>순위</h2><div id="mRank" class="plist"></div></div>
+    <div class="card"><h2>주고받은 단어</h2><div class="wordlist" id="mUsed"></div></div>
+    <div class="btnrow">
+      <button class="btn pri" id="mAgain" hidden>대기실로</button>
+      <button class="btn" id="mHome">처음으로</button>
+    </div>
+  </section>
 </div>
 
 <!-- ===== 버전 기록 모달 ===== -->
@@ -282,6 +377,8 @@ section[hidden]{display:none !important}
 <script src="dict.js"></script>
 <script src="extra.js"></script>
 <script src="core.js"></script>
+<script src="net.js"></script>
 <script src="game.js"></script>
+<script src="multi.js"></script>
 </body>
 </html>
