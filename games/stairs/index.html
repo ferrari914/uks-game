@@ -179,8 +179,12 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    ========================================================================= */
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.1.0';
+var VERSION='1.2.0';
 var CHANGELOG=[
+ {v:'1.2.0',t:['우주로 배경을 바꿨다 — 성운, 3겹으로 흐르는 별, 먼 행성',
+               '가끔 유성이 지나간다',
+               '주인공이 우주비행사가 됐다 — 금색 바이저가 바라보는 방향이다',
+               '계단 앞 모서리가 형광으로 빛나 어두운 우주에서도 잘 보인다']},
  {v:'1.1.0',t:['게임 화면을 입체적으로 다시 그렸다 — 위로 갈수록 계단이 작아지는 원근',
                '멀리 있는 계단은 배경색으로 바래게 해 높이가 실감나도록',
                '별이 층수에 따라 다른 속도로 흐르는 배경 (그림 파일은 쓰지 않는다)',
@@ -279,94 +283,61 @@ function loadMqtt(){
 }
 
 /* =========================================================================
-   명예의 전당 (전체 순위표)
-   서버가 없으므로 공용 MQTT 의 retain 메시지를 슬롯 10개로 쓴다 (방명록과 같은 기법).
-   브로커를 하나로 고정해야 목록이 갈라지지 않는다.
+   명예의 전당 (전체 순위표)  —  Firebase Realtime Database (REST)
+   2026-09-01 이관. 이전에는 공용 MQTT 브로커의 retain 메시지를 슬롯 10개로 썼는데,
+   그 브로커는 테스트용이라 주기적으로 비워져 기록이 사흘을 못 넘겼다.
 
-   한계는 UI에 그대로 적는다:
-     · retain 은 영구 보관이 아니다 — 브로커가 재시작하면 비워질 수 있다
-     · 클라이언트가 자기 점수를 직접 올리는 구조라 검증되지 않는다
-   그래서 주력은 어디까지나 "내 기록"(localStorage)이고 이건 덤이다.
-   무엇보다 **여기가 죽어도 게임은 온전해야 한다** — 게임 시작 경로와 완전히 분리한다.
+   SDK도 API 키도 쓰지 않는다 — fetch 하나면 된다. 외부 스크립트를 안 불러와야
+   file:// 요건과 "게임당 파일 하나" 관례가 유지된다.
+   (Origin: null 로도 CORS 가 열려 있어 file:// 에서도 호출된다 — 실측 확인)
+
+   서버 규칙이 강제하는 것:
+     · {name: 1~12자, score: 0~99999999 정수, ts: 숫자} 형식을 벗어나면 거부
+     · 추가만 되고 **수정·삭제는 아무도 못 한다** — 남의 기록을 지울 수 없게 하려는 것
+   그래서 슬롯을 덮어쓰던 예전 방식은 통째로 걷어냈다. 순위표 길이 제약도 사라졌다.
    ========================================================================= */
-var HOF_BROKER='wss://broker.emqx.io:8084/mqtt';
-var HOF_TOPIC='eknight_stairs_hof_v1/';
-var HOF_SLOTS=10;
+var HOF_URL='https://tetris260827-30fe0-default-rtdb.asia-southeast1.firebasedatabase.app/ranking/stairs.json';
+var HOF_TOP=20;
 
 var HOF=(function(){
-  var cl=null, slots=new Array(HOF_SLOTS), state='idle', waiters=[];
-  function list(){
-    var a=[];
-    for(var i=0;i<HOF_SLOTS;i++){
-      var e=slots[i];
-      if(e&&typeof e.f==='number'&&e.f>0)a.push({slot:i,n:e.n,f:e.f,t:e.t});
-    }
-    a.sort(function(x,y){return y.f-x.f||x.t-y.t});
-    return a;
-  }
-  function done(ok){
-    state=ok?'on':'fail';
+  var state='idle', list=null, waiters=[];
+  function finish(ok,l){
+    state=ok?'on':'fail'; list=ok?l:null;
     var w=waiters; waiters=[];
-    w.forEach(function(fn){fn(ok?list():null)});
-  }
-  function open(cb){
-    if(state==='on')return cb(list());
-    waiters.push(cb);
-    if(state==='loading')return;
-    state='loading';
-    var settled=false;
-    var giveUp=setTimeout(function(){ if(!settled){settled=true;done(false)} },9000);
-    loadMqtt().then(function(){
-      var c=window.mqtt.connect(HOF_BROKER,{
-        clientId:'sthof_'+Math.random().toString(16).slice(2,10),
-        clean:true,reconnectPeriod:0,connectTimeout:7000,keepalive:30});
-      c.on('connect',function(){
-        cl=c;
-        c.subscribe(HOF_TOPIC+'+',{qos:0});
-        /* retain 메시지는 구독 직후 몰려 들어온다. 잠깐 기다렸다가 확정한다. */
-        setTimeout(function(){ if(!settled){settled=true;clearTimeout(giveUp);done(true)} },1500);
-      });
-      c.on('message',function(t,p){
-        var i=parseInt(t.slice(HOF_TOPIC.length),10);
-        if(isNaN(i)||i<0||i>=HOF_SLOTS)return;
-        var v=p.toString();
-        if(!v){slots[i]=null;return}
-        try{
-          var o=JSON.parse(v);
-          slots[i]={n:cleanName(o.n),f:Math.max(0,Math.floor(o.f)||0),t:+o.t||0};
-        }catch(e){}
-      });
-      c.on('error',function(){ if(!settled){settled=true;clearTimeout(giveUp);done(false)} });
-    })['catch'](function(){ if(!settled){settled=true;clearTimeout(giveUp);done(false)} });
+    w.forEach(function(fn){fn(list)});
   }
   return {
-    load:open,
-    ready:function(){return state==='on'},
-    /* 등재 자격: 빈 슬롯이 있거나, 가장 낮은 기록보다 높으면 된다 */
-    qualifies:function(floor){
-      if(state!=='on')return false;
-      var a=list();
-      if(a.length<HOF_SLOTS)return floor>0;
-      return floor>a[a.length-1].f;
+    load:function(cb){
+      if(state==='on')return cb(list);
+      waiters.push(cb);
+      if(state==='loading')return;
+      state='loading';
+      var done=false;
+      var to=setTimeout(function(){if(!done){done=true;finish(false)}},9000);
+      fetch(HOF_URL+'?orderBy=%22score%22&limitToLast='+HOF_TOP,{cache:'no-store'})
+        .then(function(r){if(!r.ok)throw new Error('http');return r.json()})
+        .then(function(o){
+          if(done)return; done=true; clearTimeout(to);
+          var a=[];
+          if(o)Object.keys(o).forEach(function(k){
+            var e=o[k];
+            if(e&&typeof e.score==='number')
+              a.push({n:cleanName(e.name),f:Math.floor(e.score),t:+e.ts||0});
+          });
+          a.sort(function(x,y){return y.f-x.f||x.t-y.t});
+          finish(true,a);
+        })['catch'](function(){
+          if(done)return; done=true; clearTimeout(to); finish(false);
+        });
     },
+    ready:function(){return state==='on'},
+    invalidate:function(){state='idle';list=null},
     submit:function(name,floor,cb){
-      if(state!=='on'||!cl)return cb(false);
-      var a=list(), target=-1;
-      if(a.length<HOF_SLOTS){                      // 빈 슬롯 먼저
-        var used={}; a.forEach(function(e){used[e.slot]=1});
-        for(var i=0;i<HOF_SLOTS;i++)if(!used[i]){target=i;break}
-      }
-      if(target<0){                                // 가장 낮은 기록을 밀어낸다
-        var last=a[a.length-1];
-        if(!last||floor<=last.f)return cb(false);
-        target=last.slot;
-      }
-      var e={n:cleanName(name),f:Math.floor(floor),t:nowMs()};
-      try{
-        cl.publish(HOF_TOPIC+target,JSON.stringify(e),{qos:0,retain:true});
-        slots[target]=e;
-        cb(true);
-      }catch(err){cb(false)}
+      var body={name:cleanName(name).slice(0,12),score:Math.floor(floor),ts:nowMs()};
+      if(!(body.score>0))return cb(false);
+      fetch(HOF_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+                     body:JSON.stringify(body)})
+        .then(function(r){cb(!!r.ok)})['catch'](function(){cb(false)});
     }
   };
 })();
@@ -448,6 +419,7 @@ function makeView(cv,G){
   var sw=46, sh=34;
   var PERSP=0.055;                 // 한 칸 멀어질 때마다 줄어드는 비율
   var stars=null, parts=[], lastT=0, stepT=0, seenFloor=-1, deadSpawned=false;
+  var meteors=[], nextMeteor=0;
 
   function resize(){
     dpr=Math.min(2,window.devicePixelRatio||1);
@@ -461,8 +433,10 @@ function makeView(cv,G){
 
   /* ---- 색 ---- */
   function rgb(h){return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]}
-  var C_TOP=rgb('#3b466e'), C_LIP=rgb('#5b6ba6'), C_FRONT=rgb('#161a2b'),
-      C_EDGE=rgb('#2a3252'), C_FOG=rgb('#0b0e1a');
+  /* 우주는 어둡다. 계단이 배경에 묻히지 않도록 앞 모서리에 형광 띠를 두른다 —
+     "다음 계단이 어느 쪽인가"는 이 게임의 전부라 여기서 대비를 포기하면 안 된다. */
+  var C_TOP=rgb('#2e3a63'), C_LIP=rgb('#7fd8ff'), C_FRONT=rgb('#0f1424'),
+      C_EDGE=rgb('#3a4a7a'), C_FOG=rgb('#070713');
   function mix(a,b,t){
     return 'rgb('+((a[0]+(b[0]-a[0])*t)|0)+','+((a[1]+(b[1]-a[1])*t)|0)+','+((a[2]+(b[2]-a[2])*t)|0)+')';
   }
@@ -475,30 +449,92 @@ function makeView(cv,G){
      ∫ 1/(1+r·k) dr = ln(1+r·k)/k — 닫힌 식이라 카메라가 소수여도 매끄럽다. */
   function yOff(r){var v=1+r*PERSP; if(v<0.18)v=0.18; return (sh/PERSP)*Math.log(v)}
 
-  /* ---- 배경 ---- */
+  /* ---- 배경: 우주 ----
+     성운과 행성은 매 프레임 다시 만들 필요가 없어 오프스크린에 한 번만 그려두고
+     복사한다. 별과 유성만 매 프레임 움직인다. */
+  var bgCv=null;
+  function paintBackdrop(){
+    bgCv=document.createElement('canvas');
+    bgCv.width=Math.max(1,Math.round(W)); bgCv.height=Math.max(1,Math.round(H));
+    var b=bgCv.getContext('2d');
+    var g=b.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0b0a1e'); g.addColorStop(0.5,'#070713'); g.addColorStop(1,'#04040b');
+    b.fillStyle=g; b.fillRect(0,0,W,H);
+    var neb=[[0.22,0.24,'#5b2ea8',0.30],[0.78,0.42,'#1a6b8f',0.24],[0.45,0.72,'#8f2a6b',0.18]];
+    for(var i=0;i<neb.length;i++){
+      var n=neb[i], nx=n[0]*W, ny=n[1]*H, rad=Math.max(W,H)*0.55;
+      var rg=b.createRadialGradient(nx,ny,0,nx,ny,rad);
+      rg.addColorStop(0,n[2]); rg.addColorStop(1,'rgba(0,0,0,0)');
+      b.globalAlpha=n[3]; b.fillStyle=rg; b.fillRect(0,0,W,H);
+    }
+    b.globalAlpha=1;
+  }
   function mkStars(){
-    var rnd=mulberry32(20260828), a=[];
-    for(var i=0;i<80;i++)a.push({x:rnd(),y:rnd(),s:rnd()*1.7+0.5,d:0.10+rnd()*0.55});
+    var rnd=mulberry32(20260901), a=[];
+    /* 3겹 — 멀수록 작고 어둡고 천천히 흐른다 */
+    var L=[[110,0.9,0.22,0.08],[60,1.5,0.45,0.20],[26,2.4,0.85,0.42]];
+    for(var i=0;i<L.length;i++)
+      for(var j=0;j<L[i][0];j++)
+        a.push({x:rnd(),y:rnd(),s:L[i][1],b:L[i][2]*(0.4+rnd()*0.6),d:L[i][3],cross:i===2&&rnd()<0.35});
     stars=a;
   }
-  function bg(){
-    var g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#0e1224'); g.addColorStop(0.55,'#0a0d1a'); g.addColorStop(1,'#07080f');
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  function drawStars(){
     if(!stars)mkStars();
-    /* 시차 — 층마다 다른 속도로 흐른다. 멀리 있는 것일수록 천천히 */
     for(var i=0;i<stars.length;i++){
       var st=stars[i];
-      var y=((st.y*H + camY*sh*st.d) % H + H) % H;
-      ctx.fillStyle='rgba(150,175,225,'+(0.10+st.d*0.30).toFixed(2)+')';
-      ctx.fillRect(st.x*W, y, st.s, st.s);
+      var y=((st.y*H + camY*sh*st.d) % H + H) % H, x=st.x*W;
+      ctx.fillStyle='rgba(214,228,255,'+st.b.toFixed(2)+')';
+      ctx.fillRect(x,y,st.s,st.s);
+      if(st.cross){
+        ctx.fillStyle='rgba(214,228,255,'+(st.b*0.45).toFixed(2)+')';
+        ctx.fillRect(x-st.s*1.6,y+st.s*0.35,st.s*4.2,st.s*0.3);
+        ctx.fillRect(x+st.s*0.35,y-st.s*1.6,st.s*0.3,st.s*4.2);
+      }
     }
-    /* 높이 눈금 — 얼마나 빨리 오르는지 몸으로 느끼게 하는 유일한 단서 */
-    ctx.strokeStyle='rgba(48,56,86,.5)'; ctx.lineWidth=1;
-    var span=sh*6, off=((camY*sh)%span+span)%span;
-    for(var y2=off;y2<H;y2+=span){
-      ctx.beginPath(); ctx.moveTo(0,Math.round(y2)+.5); ctx.lineTo(W,Math.round(y2)+.5); ctx.stroke();
+  }
+  function drawPlanet(){
+    var pr=Math.min(W,H)*0.17, pcx=W*0.80;
+    var pcy=H*0.17 + ((camY*sh*0.035)%(H*1.6));       // 아주 천천히 흐른다
+    if(pcy>H+pr)pcy-=H*1.6;
+    var pg=ctx.createRadialGradient(pcx-pr*0.4,pcy-pr*0.4,pr*0.1,pcx,pcy,pr);
+    pg.addColorStop(0,'#6d7fb8'); pg.addColorStop(0.55,'#2d3560'); pg.addColorStop(1,'#12142a');
+    ctx.beginPath();ctx.arc(pcx,pcy,pr,0,6.3);ctx.fillStyle=pg;ctx.fill();
+    ctx.strokeStyle='rgba(160,190,255,.22)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(pcx,pcy,pr,0,6.3);ctx.stroke();
+  }
+  /* ---- 유성 ---- */
+  function updateMeteors(now,dt){
+    if(REDUCED)return;
+    if(!nextMeteor)nextMeteor=now+2500+Math.random()*5000;
+    if(now>nextMeteor){
+      var fromLeft=Math.random()<0.5;
+      meteors.push({x:fromLeft?-70:W+70, y:Math.random()*H*0.55,
+        vx:(fromLeft?1:-1)*(560+Math.random()*420), vy:210+Math.random()*180,
+        age:0, life:1.1+Math.random()*0.5, len:70+Math.random()*90});
+      nextMeteor=now+4500+Math.random()*9000;
     }
+    for(var i=meteors.length-1;i>=0;i--){
+      var m=meteors[i];
+      m.age+=dt;
+      if(m.age>=m.life){meteors.splice(i,1);continue}
+      m.x+=m.vx*dt; m.y+=m.vy*dt;
+      var k=Math.hypot(m.vx,m.vy), tx=m.x-m.vx/k*m.len, ty=m.y-m.vy/k*m.len;
+      var a=Math.sin(Math.min(1,m.age/m.life)*Math.PI);   // 나타났다 사라진다
+      var lg=ctx.createLinearGradient(m.x,m.y,tx,ty);
+      lg.addColorStop(0,'rgba(255,255,255,'+(0.9*a).toFixed(2)+')');
+      lg.addColorStop(0.35,'rgba(160,214,255,'+(0.42*a).toFixed(2)+')');
+      lg.addColorStop(1,'rgba(160,214,255,0)');
+      ctx.strokeStyle=lg; ctx.lineWidth=2.1; ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(tx,ty);ctx.stroke();
+      ctx.lineCap='butt';
+    }
+  }
+  function bg(now,dt){
+    if(!bgCv||bgCv.width!==Math.round(W)||bgCv.height!==Math.round(H))paintBackdrop();
+    ctx.drawImage(bgCv,0,0);
+    drawStars();
+    drawPlanet();
+    updateMeteors(now,dt);
   }
 
   /* ---- 계단 한 칸 ----
@@ -519,34 +555,49 @@ function makeView(cv,G){
     }
   }
 
-  /* ---- 캐릭터 ---- */
+  /* ---- 캐릭터: 우주비행사 ----
+     흰 여압복 + 금색 바이저. 어두운 우주에서 대비가 가장 큰 조합이라 골랐다 —
+     이 게임은 "지금 어느 쪽을 보는가"를 순간에 읽어야 해서 대비가 곧 실력이다.
+     바이저가 머리 앞쪽으로 치우쳐 있어 그 자체가 방향 표시가 된다. */
   function hero(x,y,facing,dead,anim){
-    var s=sw*0.42, col=dead?'#5c637d':'#00e5ff', f=facing;
+    var s=sw*0.42, f=facing;
     /* 한 칸 오를 때 살짝 튀어오르고 착지에서 눌린다. 110ms 안에 끝나야
        초당 6회 연타를 따라온다 (한 칸 간격이 154ms). */
-    var hop=dead?0:Math.sin(anim*Math.PI), sq=1-0.16*hop, st=1+0.16*hop;
+    var hop=dead?0:Math.sin(anim*Math.PI), sq=1-0.14*hop, st=1+0.14*hop;
     y-=hop*sh*0.22;
+    var suit=dead?'#6b7085':'#eef2ff', belt=dead?'#4e5468':'#c3cbe6',
+        pack=dead?'#565b6e':'#9aa6c8', visor=dead?'#8a6a2a':'#ffb703';
     ctx.save();
-    if(!dead&&!REDUCED){ctx.shadowColor='rgba(0,229,255,.45)';ctx.shadowBlur=16}
-    ctx.fillStyle=col;
-    ctx.beginPath();                                     // 몸 — 어깨가 앞으로 나간다
-    ctx.moveTo(x-f*s*0.42*sq,y);
-    ctx.lineTo(x-f*s*0.42*sq,y-s*1.35*st);
-    ctx.lineTo(x+f*s*0.62*sq,y-s*1.35*st);
-    ctx.lineTo(x+f*s*0.42*sq,y-s*0.2*st);
-    ctx.lineTo(x+f*s*0.42*sq,y);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();                                     // 머리
-    ctx.arc(x+f*s*0.1,y-s*2.05*st,s*0.5*sq,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle=col;                                   // 부리 — 바라보는 방향
+    if(!dead&&!REDUCED){ctx.shadowColor='rgba(190,215,255,.45)';ctx.shadowBlur=14}
+    /* 등짐은 몸 뒤로 확실히 튀어나와야 한다. 이 비대칭이 방향을 알려주는
+       가장 큰 단서라, 살짝 겹치는 정도로는 작은 화면에서 안 보인다. */
+    ctx.fillStyle=pack;
+    ctx.fillRect(x-f*s*0.86,y-s*1.60*st,s*0.44*(f>0?1:-1),s*0.86*st);
+    ctx.fillStyle=dead?'#454a5c':'#7f8cb0';               // 산소통 띠
+    ctx.fillRect(x-f*s*0.86,y-s*1.24*st,s*0.44*(f>0?1:-1),s*0.10);
+    ctx.fillStyle=suit;                                   // 몸 — 어깨가 앞으로 나간다
     ctx.beginPath();
-    ctx.moveTo(x+f*s*0.35,y-s*2.22*st);
-    ctx.lineTo(x+f*s*1.15,y-s*2.02*st);
-    ctx.lineTo(x+f*s*0.35,y-s*1.86*st);
+    ctx.moveTo(x-f*s*0.46*sq,y);
+    ctx.lineTo(x-f*s*0.46*sq,y-s*1.42*st);
+    ctx.lineTo(x+f*s*0.52*sq,y-s*1.42*st);
+    ctx.lineTo(x+f*s*0.46*sq,y-s*0.2*st);
+    ctx.lineTo(x+f*s*0.46*sq,y);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#04202a';                             // 눈
-    ctx.beginPath(); ctx.arc(x+f*s*0.28,y-s*2.12*st,s*0.11,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=belt;                                   // 허리띠
+    ctx.fillRect(x-f*s*0.46*sq,y-s*0.34*st,s*0.92*sq*(f>0?1:-1),s*0.16);
+    ctx.fillStyle=suit;                                   // 헬멧
+    ctx.beginPath(); ctx.arc(x,y-s*2.12*st,s*0.62*sq,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    /* 금색 바이저 = 바라보는 방향. 헬멧 앞쪽으로 뚜렷하게 치우쳐야
+       "지금 어디를 보는가"가 0.2초 안에 읽힌다. */
+    ctx.fillStyle=visor;
+    ctx.beginPath();
+    ctx.ellipse(x+f*s*0.20,y-s*2.14*st,s*0.40*sq,s*0.34*sq,0,0,Math.PI*2);
+    ctx.fill();
+    if(!dead){
+      ctx.fillStyle='rgba(255,255,255,.6)';               // 바이저 반사광
+      ctx.beginPath(); ctx.arc(x+f*s*0.34,y-s*2.26*st,s*0.12,0,Math.PI*2); ctx.fill();
+    }
   }
 
   /* ---- 죽을 때 파편 ---- */
@@ -565,7 +616,7 @@ function makeView(cv,G){
       p.age+=dt;
       if(p.age>=p.life){parts.splice(i,1);continue}
       p.vy+=520*dt; p.x+=p.vx*dt; p.y+=p.vy*dt;
-      ctx.fillStyle='rgba(0,229,255,'+(1-p.age/p.life).toFixed(2)+')';
+      ctx.fillStyle='rgba(214,228,255,'+(1-p.age/p.life).toFixed(2)+')';
       ctx.fillRect(p.x,p.y,p.s,p.s);
     }
   }
@@ -585,7 +636,7 @@ function makeView(cv,G){
         var k=REDUCED?1:0.28;
         camX+=(tx-camX)*k; camY+=(ty-camY)*k;
       }
-      bg();
+      bg(now,dt);
       var baseY=H*0.62, cx=W/2;
       var lo=Math.max(0,G.floor-9), hi=G.floor+22;
       /* 먼 것부터 그려서 가까운 것이 덮게 한다 */
@@ -787,7 +838,7 @@ function recRows(list){
 function hofCardHtml(){
   var st=S.hof.state;
   if(st==='loading')return '<div class="empty">불러오는 중…</div>';
-  if(st==='fail')return '<div class="empty">지금은 불러올 수 없어요. (게임에는 영향이 없습니다)</div>';
+  if(st==='fail')return '<div class="empty">순위표를 불러오지 못했습니다. (게임에는 영향이 없습니다)</div>';
   var l=S.hof.list||[];
   if(!l.length)return '<div class="empty">아직 아무도 오르지 않았습니다. 첫 기록의 주인이 되어보세요.</div>';
   return recRows(l);
@@ -822,8 +873,8 @@ function renderHof(){
       '<h1>🏆 명예의 전당</h1>'+
       '<div class="card"><div class="cardHead"><h2>전체 순위표</h2></div>'+
         hofCardHtml()+
-        '<p class="tiny">전체 순위표는 공용 게시판에 얹어 둔 것이라 <b>기록이 사라질 수 있고 검증되지 않습니다.</b> '+
-        '아래 내 기록은 이 기기에 저장되므로 영향을 받지 않습니다.</p>'+
+        '<p class="tiny">전체 순위표는 영구 보관되지만 <b>점수는 검증되지 않습니다</b> — 누구나 기록을 보낼 수 있습니다. '+
+        '한 번 올린 기록은 <b>수정·삭제할 수 없습니다.</b></p>'+
       '</div>'+
       '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
     '</div>';
@@ -931,7 +982,7 @@ function endSingle(){
   var best=bestFloor();
   function paint(){
     if(S.screen!=='over')return;
-    var canSubmit=(!submitted&&S.hof.state==='on'&&HOF.qualifies(floor));
+    var canSubmit=(!submitted&&S.hof.state==='on'&&floor>0);
     $('#app').innerHTML=
     '<div class="wrap">'+
       '<div class="topbar"><button class="hublink" id="home" aria-label="첫 화면으로 돌아가기">← 첫 화면</button>'+
@@ -951,8 +1002,8 @@ function endSingle(){
           '<input type="text" id="hofNick" maxlength="8" value="'+esc(S.name)+'" placeholder="이름">'+
           '<div style="height:10px"></div>'+
           '<button class="btn" id="hofGo">🏆 명예의 전당에 등록</button></div>':'')+
-        '<p class="tiny">전체 순위표는 공용 게시판에 얹어 둔 것이라 <b>기록이 사라질 수 있고 검증되지 않습니다.</b> '+
-        '위의 이번 기록과 내 기록은 이 기기에 저장되므로 영향을 받지 않습니다.</p>'+
+        '<p class="tiny">전체 순위표는 영구 보관되지만 <b>점수는 검증되지 않습니다</b> — 누구나 기록을 보낼 수 있습니다. '+
+        '한 번 올린 기록은 <b>수정·삭제할 수 없습니다.</b></p>'+
       '</div>'+
       '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
     '</div>';
@@ -965,7 +1016,8 @@ function endSingle(){
       setNick(nm); S.name=nm;
       go.disabled=true; go.textContent='등록 중…';
       HOF.submit(nm,floor,function(ok){
-        if(ok){submitted=true;S.hof.list=null;S.hof.state='loading';
+        if(ok){submitted=true;HOF.invalidate();
+          S.hof.list=null;S.hof.state='loading';paint();
           HOF.load(function(l){S.hof.state=l?'on':'fail';S.hof.list=l;paint();});
           toast('명예의 전당에 등록했습니다');
         }else{toast('등록하지 못했습니다');go.disabled=false;go.textContent='🏆 명예의 전당에 등록'}
