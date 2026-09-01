@@ -111,7 +111,7 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
 #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hud{
   position:relative;z-index:2;
-  padding:calc(8px + env(safe-area-inset-top)) 64px 10px 14px;   /* 오른쪽은 나가기 버튼 자리 */
+  padding:calc(8px + env(safe-area-inset-top)) 116px 10px 14px;  /* 오른쪽은 소리·나가기 버튼 자리 */
   display:flex;align-items:center;gap:12px;pointer-events:none;
   background:linear-gradient(180deg,rgba(7,8,15,.92),rgba(7,8,15,.55) 70%,rgba(7,8,15,0));
   text-shadow:0 1px 6px rgba(0,0,0,.8)
@@ -125,6 +125,7 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
 .gpct{font-size:12px;color:var(--dim);width:38px;text-align:right;font-variant-numeric:tabular-nums}
 .exit{position:absolute;z-index:3;right:10px;top:calc(8px + env(safe-area-inset-top));
   min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:12px;background:rgba(22,25,39,.8);color:var(--dim)}
+.sfxBtn{right:62px;font-size:17px}
 .spacer{flex:1}
 .pads{position:relative;z-index:2;display:flex;gap:10px;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
 .pad{
@@ -135,7 +136,7 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
 .pad:active{background:rgba(0,229,255,.16);border-color:var(--accent)}
 .pad small{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-top:4px}
 .board{
-  position:absolute;z-index:2;right:10px;top:calc(74px + env(safe-area-inset-top));
+  position:absolute;z-index:2;right:10px;top:calc(78px + env(safe-area-inset-top));
   width:150px;background:rgba(16,18,32,.86);border:1px solid var(--line);border-radius:14px;padding:8px 10px
 }
 .board h5{margin:0 0 6px;font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.5px}
@@ -179,8 +180,17 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    ========================================================================= */
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.2.0';
+var VERSION='1.3.0';
 var CHANGELOG=[
+ {v:'1.3.0',t:['명예의 전당을 영구 보존 저장소로 옮겼다 — 기록이 더는 사라지지 않는다',
+               '고도에 따라 하늘이 변한다 — 대기권 → 우주 → 성운 → 은하 띠 → 은하 중심',
+               '내 최고 기록 층에 표식이 선다. 넘어서면 알려준다',
+               '100층마다 이정표 계단에 층수가 새겨진다',
+               '체력이 바닥나면 화면 가장자리가 붉게 맥동한다',
+               '빨리 오를수록 별이 선으로 늘어난다',
+               '한 칸 오를 때마다 발밑에 빛 파문이 퍼진다',
+               '아주 가끔 인공위성이 지나간다',
+               '소리가 생겼다 — 발소리·방향 전환·이정표·신기록·사망. 오른쪽 위 버튼으로 끈다']},
  {v:'1.2.0',t:['우주로 배경을 바꿨다 — 성운, 3겹으로 흐르는 별, 먼 행성',
                '가끔 유성이 지나간다',
                '주인공이 우주비행사가 됐다 — 금색 바이저가 바라보는 방향이다',
@@ -240,6 +250,62 @@ var store={
   get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 };
+/* =========================================================================
+   소리 — 파일 없이 합성한다 (Web Audio)
+   음원 파일을 넣으면 file:// 요건과 "게임당 파일 하나" 관례가 깨지고 로딩도 생긴다.
+   짧은 발음 몇 개라 오실레이터로 충분하다.
+   브라우저는 사용자가 화면을 건드리기 전엔 소리를 못 내게 막으므로,
+   AudioContext 는 첫 입력 때 만들어진다.
+   ========================================================================= */
+var SFX=(function(){
+  var ac=null, on=(store.get('stairs.sound','1')==='1');
+  function ctx(){
+    if(ac)return ac;
+    var C=window.AudioContext||window.webkitAudioContext;
+    if(!C)return null;
+    try{ac=new C()}catch(e){ac=null}
+    return ac;
+  }
+  function beep(freq,dur,type,vol,slide){
+    if(!on)return;
+    var a=ctx(); if(!a)return;
+    if(a.state==='suspended'){try{a.resume()}catch(e){}}
+    var t=a.currentTime, o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine';
+    o.frequency.setValueAtTime(freq,t);
+    if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(40,slide),t+dur);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol||0.09,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+  function noise(dur,vol){
+    if(!on)return;
+    var a=ctx(); if(!a)return;
+    var n=Math.max(1,Math.floor(a.sampleRate*dur)), buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
+    for(var i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);      // 뒤로 갈수록 잦아든다
+    var src=a.createBufferSource(); src.buffer=buf;
+    var g=a.createGain(); g.gain.value=vol||0.10;
+    src.connect(g); g.connect(a.destination); src.start();
+  }
+  return {
+    isOn:function(){return on},
+    toggle:function(){
+      on=!on; store.set('stairs.sound',on?'1':'0');
+      if(on)beep(880,0.07,'sine',0.07);
+      return on;
+    },
+    step:function(){beep(520,0.045,'triangle',0.055)},
+    turn:function(){beep(392,0.055,'triangle',0.055,466)},
+    mile:function(){beep(784,0.10,'sine',0.075);setTimeout(function(){beep(1047,0.16,'sine',0.075)},90)},
+    record:function(){[659,831,988,1319].forEach(function(f,i){setTimeout(function(){beep(f,0.15,'sine',0.085)},i*95)})},
+    wall:function(){beep(150,0.22,'square',0.09,60);noise(0.18,0.09)},
+    fade:function(){beep(420,0.55,'sine',0.075,90)},
+    go:function(){beep(660,0.12,'sine',0.08)}
+  };
+})();
+
 function getNick(){return store.get('stairs.nick','')}
 function setNick(v){store.set('stairs.nick',v)}
 
@@ -366,6 +432,7 @@ function makeGame(seed){
   var G={
     floor:0, facing:1, gauge:TUNE.gaugeMax,
     started:false, dead:false, why:'', deadAt:0, wallSide:0,
+    mark:0, markHit:false,        // 내 최고 기록 층 — 오르는 중에 목표가 보이게 한다
     dir:dir, xAt:xAt
   };
   G.drain=function(){                  // 지금 층의 초당 감소량 (%)
@@ -404,22 +471,27 @@ function makeGame(seed){
 }
 
 /* =========================================================================
-   렌더러 (캔버스 2D)
+   렌더러 (캔버스 2D)  —  이미지 파일은 한 장도 쓰지 않는다
    플레이어를 화면 62% 높이에 고정하고 카메라가 따라 오른다.
 
-   깊이는 세 가지로 만든다 — 이미지 파일은 한 장도 쓰지 않는다
-   (file:// 로 열려야 하고, 게임 파일은 index.html 하나로 유지한다).
-     ① 원근  : 위로 갈수록 계단이 작아지고 간격이 좁아진다
-     ② 조명  : 왼쪽 위 광원 하나. 윗면이 가장 밝고 앞면이 어둡다
-     ③ 공기원근 : 멀수록 배경색 쪽으로 바래진다 — 이게 깊이감의 절반이다
+   깊이는 세 가지로 만든다
+     ① 원근      : 위로 갈수록 계단이 작아지고 간격이 좁아진다
+     ② 조명      : 왼쪽 위 광원 하나. 윗면이 밝고 앞면이 어둡다
+     ③ 공기원근  : 멀수록 배경색 쪽으로 바래진다 — 깊이감의 절반은 이것이다
+
+   그리고 층수 자체가 보상이 되도록, **고도에 따라 하늘이 변한다.**
+   0층은 대기권(푸른빛), 120층부터 우주, 500층부터 성운이 짙어지고,
+   1200층부터 은하 띠가, 2000층부터 은하 중심이 보인다.
    ========================================================================= */
 function makeView(cv,G){
   var ctx=cv.getContext('2d'), dpr=1, W=0, H=0;
   var camX=0, camY=0, first=true;
   var sw=46, sh=34;
-  var PERSP=0.055;                 // 한 칸 멀어질 때마다 줄어드는 비율
+  var PERSP=0.055;
   var stars=null, parts=[], lastT=0, stepT=0, seenFloor=-1, deadSpawned=false;
-  var meteors=[], nextMeteor=0;
+  var meteors=[], nextMeteor=0, sats=[], nextSat=0, rings=[];
+  var spd=0, lastStepAt=0;                 // 초당 몇 칸 오르는가 (별을 늘리는 데 쓴다)
+  var bgCv=null, bgAtFloor=-9999;
 
   function resize(){
     dpr=Math.min(2,window.devicePixelRatio||1);
@@ -428,50 +500,87 @@ function makeView(cv,G){
     ctx.setTransform(dpr,0,0,dpr,0,0);
     var k=Math.min(1.25,Math.max(.78,W/390));
     sw=46*k; sh=34*k;
+    bgAtFloor=-9999;                        // 크기가 바뀌면 배경을 다시 그린다
   }
   window.addEventListener('resize',resize);
 
   /* ---- 색 ---- */
   function rgb(h){return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]}
-  /* 우주는 어둡다. 계단이 배경에 묻히지 않도록 앞 모서리에 형광 띠를 두른다 —
-     "다음 계단이 어느 쪽인가"는 이 게임의 전부라 여기서 대비를 포기하면 안 된다. */
-  var C_TOP=rgb('#2e3a63'), C_LIP=rgb('#7fd8ff'), C_FRONT=rgb('#0f1424'),
-      C_EDGE=rgb('#3a4a7a'), C_FOG=rgb('#070713');
   function mix(a,b,t){
     return 'rgb('+((a[0]+(b[0]-a[0])*t)|0)+','+((a[1]+(b[1]-a[1])*t)|0)+','+((a[2]+(b[2]-a[2])*t)|0)+')';
   }
+  function lerpHex(h1,h2,t){var a=rgb(h1),b=rgb(h2);return mix(a,b,t)}
 
-  /* ---- 원근 ---- */
-  /* 가까운 쪽 배율에 상한을 둔다. 안 두면 지나온 계단이 화면 아래를
-     뒤덮어 정작 봐야 할 위쪽이 안 보인다. */
-  function scaleAt(r){var v=1+r*PERSP; if(v<0.18)v=0.18; var sc=1/v; return sc>1.42?1.42:sc}
-  /* 칸 간격도 같이 줄어야 하므로 scale 을 적분한 값이 화면 높이다.
-     ∫ 1/(1+r·k) dr = ln(1+r·k)/k — 닫힌 식이라 카메라가 소수여도 매끄럽다. */
-  function yOff(r){var v=1+r*PERSP; if(v<0.18)v=0.18; return (sh/PERSP)*Math.log(v)}
+  /* 우주는 어둡다. 계단 앞 모서리에 형광 띠를 둘러야
+     "다음 계단이 어느 쪽인가"가 유지된다 — 여기서 대비를 포기하면 게임이 망가진다. */
+  var C_TOP=rgb('#2e3a63'), C_LIP=rgb('#7fd8ff'), C_FRONT=rgb('#0f1424'),
+      C_EDGE=rgb('#3a4a7a'), C_FOG=rgb('#070713');
+  var C_MILE_TOP=rgb('#1d5f6b'), C_MILE_LIP=rgb('#5ef0d0');     // 100층 이정표
+  var C_BEST_TOP=rgb('#6b5320'), C_BEST_LIP=rgb('#ffd166');     // 내 최고 기록
 
-  /* ---- 배경: 우주 ----
-     성운과 행성은 매 프레임 다시 만들 필요가 없어 오프스크린에 한 번만 그려두고
-     복사한다. 별과 유성만 매 프레임 움직인다. */
-  var bgCv=null;
-  function paintBackdrop(){
+  /* ---- 고도별 하늘 ---- */
+  var SKY=[
+    {f:0,    a:'#123a63', b:'#0a1c3a', c:'#050b1a', neb:0.10, atm:0.60, band:0, core:0},
+    {f:120,  a:'#0b0a1e', b:'#070713', c:'#04040b', neb:0.30, atm:0.00, band:0, core:0},
+    {f:500,  a:'#180a30', b:'#0a0720', c:'#050310', neb:0.60, atm:0,    band:0, core:0},
+    {f:1200, a:'#1f0a34', b:'#0d0722', c:'#060312', neb:0.85, atm:0,    band:0.55, core:0},
+    {f:2000, a:'#2c0f3e', b:'#150828', c:'#080316', neb:1.00, atm:0,    band:1, core:1}
+  ];
+  function sky(f){
+    var i=0;
+    while(i<SKY.length-1&&f>=SKY[i+1].f)i++;
+    if(i>=SKY.length-1)return SKY[SKY.length-1];
+    var A=SKY[i], B=SKY[i+1], t=(f-A.f)/(B.f-A.f);
+    t=t<0?0:t>1?1:t;
+    return {a:lerpHex(A.a,B.a,t), b:lerpHex(A.b,B.b,t), c:lerpHex(A.c,B.c,t),
+            neb:A.neb+(B.neb-A.neb)*t, atm:A.atm+(B.atm-A.atm)*t,
+            band:A.band+(B.band-A.band)*t, core:A.core+(B.core-A.core)*t};
+  }
+  /* 성운·행성·은하는 매 프레임 다시 만들 필요가 없다. 오프스크린에 그려두고 복사하되,
+     고도가 25층쯤 바뀌면 다시 그린다 — 하늘이 서서히 변하는 게 보이도록. */
+  function paintBackdrop(f){
+    var S=sky(f);
     bgCv=document.createElement('canvas');
     bgCv.width=Math.max(1,Math.round(W)); bgCv.height=Math.max(1,Math.round(H));
     var b=bgCv.getContext('2d');
     var g=b.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#0b0a1e'); g.addColorStop(0.5,'#070713'); g.addColorStop(1,'#04040b');
+    g.addColorStop(0,S.a); g.addColorStop(0.5,S.b); g.addColorStop(1,S.c);
     b.fillStyle=g; b.fillRect(0,0,W,H);
+    if(S.band>0.02){                                  // 은하 띠 — 비스듬히 가로지른다
+      b.save(); b.translate(W*0.5,H*0.45); b.rotate(-0.62);
+      var bg2=b.createLinearGradient(0,-H*0.16,0,H*0.16);
+      bg2.addColorStop(0,'rgba(0,0,0,0)');
+      bg2.addColorStop(0.5,'rgba(190,170,255,'+(0.14*S.band).toFixed(3)+')');
+      bg2.addColorStop(1,'rgba(0,0,0,0)');
+      b.fillStyle=bg2; b.fillRect(-W,-H*0.16,W*2,H*0.32); b.restore();
+    }
     var neb=[[0.22,0.24,'#5b2ea8',0.30],[0.78,0.42,'#1a6b8f',0.24],[0.45,0.72,'#8f2a6b',0.18]];
     for(var i=0;i<neb.length;i++){
       var n=neb[i], nx=n[0]*W, ny=n[1]*H, rad=Math.max(W,H)*0.55;
       var rg=b.createRadialGradient(nx,ny,0,nx,ny,rad);
       rg.addColorStop(0,n[2]); rg.addColorStop(1,'rgba(0,0,0,0)');
-      b.globalAlpha=n[3]; b.fillStyle=rg; b.fillRect(0,0,W,H);
+      b.globalAlpha=n[3]*S.neb; b.fillStyle=rg; b.fillRect(0,0,W,H);
     }
     b.globalAlpha=1;
+    if(S.core>0.02){                                  // 은하 중심 — 아주 높은 곳에서만
+      var cg=b.createRadialGradient(W*0.5,H*0.34,0,W*0.5,H*0.34,Math.min(W,H)*0.5);
+      cg.addColorStop(0,'rgba(255,236,200,'+(0.30*S.core).toFixed(3)+')');
+      cg.addColorStop(0.4,'rgba(220,150,255,'+(0.12*S.core).toFixed(3)+')');
+      cg.addColorStop(1,'rgba(0,0,0,0)');
+      b.fillStyle=cg; b.fillRect(0,0,W,H);
+    }
+    if(S.atm>0.02){                                   // 대기권 — 아래쪽에서 지구가 빛난다
+      var ag=b.createLinearGradient(0,H,0,H*0.45);
+      ag.addColorStop(0,'rgba(90,170,255,'+(0.34*S.atm).toFixed(3)+')');
+      ag.addColorStop(1,'rgba(90,170,255,0)');
+      b.fillStyle=ag; b.fillRect(0,H*0.45,W,H*0.55);
+    }
+    bgAtFloor=f;
   }
+
+  /* ---- 별 ---- */
   function mkStars(){
     var rnd=mulberry32(20260901), a=[];
-    /* 3겹 — 멀수록 작고 어둡고 천천히 흐른다 */
     var L=[[110,0.9,0.22,0.08],[60,1.5,0.45,0.20],[26,2.4,0.85,0.42]];
     for(var i=0;i<L.length;i++)
       for(var j=0;j<L[i][0];j++)
@@ -480,12 +589,15 @@ function makeView(cv,G){
   }
   function drawStars(){
     if(!stars)mkStars();
+    /* 빨리 오를수록 별이 선으로 늘어난다 — 속도가 눈에 보이게 */
+    var stretch=Math.min(26,spd*3.4);
     for(var i=0;i<stars.length;i++){
       var st=stars[i];
       var y=((st.y*H + camY*sh*st.d) % H + H) % H, x=st.x*W;
+      var hgt=st.s+stretch*st.d*2.4;
       ctx.fillStyle='rgba(214,228,255,'+st.b.toFixed(2)+')';
-      ctx.fillRect(x,y,st.s,st.s);
-      if(st.cross){
+      ctx.fillRect(x,y,st.s,hgt);
+      if(st.cross&&stretch<4){
         ctx.fillStyle='rgba(214,228,255,'+(st.b*0.45).toFixed(2)+')';
         ctx.fillRect(x-st.s*1.6,y+st.s*0.35,st.s*4.2,st.s*0.3);
         ctx.fillRect(x+st.s*0.35,y-st.s*1.6,st.s*0.3,st.s*4.2);
@@ -494,7 +606,7 @@ function makeView(cv,G){
   }
   function drawPlanet(){
     var pr=Math.min(W,H)*0.17, pcx=W*0.80;
-    var pcy=H*0.17 + ((camY*sh*0.035)%(H*1.6));       // 아주 천천히 흐른다
+    var pcy=H*0.17 + ((camY*sh*0.035)%(H*1.6));
     if(pcy>H+pr)pcy-=H*1.6;
     var pg=ctx.createRadialGradient(pcx-pr*0.4,pcy-pr*0.4,pr*0.1,pcx,pcy,pr);
     pg.addColorStop(0,'#6d7fb8'); pg.addColorStop(0.55,'#2d3560'); pg.addColorStop(1,'#12142a');
@@ -503,79 +615,119 @@ function makeView(cv,G){
     ctx.beginPath();ctx.arc(pcx,pcy,pr,0,6.3);ctx.stroke();
   }
   /* ---- 유성 ---- */
-  function updateMeteors(now,dt){
+  function meteorsTick(now,dt){
     if(REDUCED)return;
     if(!nextMeteor)nextMeteor=now+2500+Math.random()*5000;
     if(now>nextMeteor){
       var fromLeft=Math.random()<0.5;
-      meteors.push({x:fromLeft?-70:W+70, y:Math.random()*H*0.55,
-        vx:(fromLeft?1:-1)*(560+Math.random()*420), vy:210+Math.random()*180,
-        age:0, life:1.1+Math.random()*0.5, len:70+Math.random()*90});
+      meteors.push({x:fromLeft?-70:W+70,y:Math.random()*H*0.55,
+        vx:(fromLeft?1:-1)*(560+Math.random()*420),vy:210+Math.random()*180,
+        age:0,life:1.1+Math.random()*0.5,len:70+Math.random()*90});
       nextMeteor=now+4500+Math.random()*9000;
     }
     for(var i=meteors.length-1;i>=0;i--){
-      var m=meteors[i];
-      m.age+=dt;
+      var m=meteors[i]; m.age+=dt;
       if(m.age>=m.life){meteors.splice(i,1);continue}
       m.x+=m.vx*dt; m.y+=m.vy*dt;
-      var k=Math.hypot(m.vx,m.vy), tx=m.x-m.vx/k*m.len, ty=m.y-m.vy/k*m.len;
-      var a=Math.sin(Math.min(1,m.age/m.life)*Math.PI);   // 나타났다 사라진다
+      var k=Math.sqrt(m.vx*m.vx+m.vy*m.vy), tx=m.x-m.vx/k*m.len, ty=m.y-m.vy/k*m.len;
+      var a=Math.sin(Math.min(1,m.age/m.life)*Math.PI);
       var lg=ctx.createLinearGradient(m.x,m.y,tx,ty);
       lg.addColorStop(0,'rgba(255,255,255,'+(0.9*a).toFixed(2)+')');
       lg.addColorStop(0.35,'rgba(160,214,255,'+(0.42*a).toFixed(2)+')');
       lg.addColorStop(1,'rgba(160,214,255,0)');
-      ctx.strokeStyle=lg; ctx.lineWidth=2.1; ctx.lineCap='round';
+      ctx.strokeStyle=lg;ctx.lineWidth=2.1;ctx.lineCap='round';
       ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(tx,ty);ctx.stroke();
       ctx.lineCap='butt';
     }
   }
-  function bg(now,dt){
-    if(!bgCv||bgCv.width!==Math.round(W)||bgCv.height!==Math.round(H))paintBackdrop();
+  /* ---- 인공위성 — 유성보다 훨씬 드물게, 천천히 ---- */
+  function satsTick(now,dt){
+    if(REDUCED)return;
+    if(!nextSat)nextSat=now+25000+Math.random()*40000;
+    if(now>nextSat){
+      var fromLeft=Math.random()<0.5;
+      sats.push({x:fromLeft?-60:W+60,y:H*(0.10+Math.random()*0.42),
+        vx:(fromLeft?1:-1)*(26+Math.random()*18),vy:(Math.random()-0.5)*8,
+        s:Math.min(W,H)*0.050, t:0});
+      nextSat=now+60000+Math.random()*90000;
+    }
+    for(var i=sats.length-1;i>=0;i--){
+      var v=sats[i]; v.t+=dt; v.x+=v.vx*dt; v.y+=v.vy*dt;
+      if(v.x<-140||v.x>W+140){sats.splice(i,1);continue}
+      var s=v.s, d=v.vx>0?1:-1;
+      ctx.save();
+      if(!REDUCED){ctx.shadowColor='rgba(150,190,255,.5)';ctx.shadowBlur=8}
+      ctx.fillStyle='#cdd8f2'; ctx.fillRect(v.x-s*0.5,v.y-s*0.36,s,s*0.72);   // 본체
+      ctx.restore();
+      ctx.fillStyle='#5b8ede';                                                // 태양 전지판
+      ctx.fillRect(v.x-s*2.2,v.y-s*0.26,s*1.6,s*0.52);
+      ctx.fillRect(v.x+s*0.6,v.y-s*0.26,s*1.6,s*0.52);
+      ctx.fillStyle='#8fb2ea';                                                // 전지판 격자
+      ctx.fillRect(v.x-s*2.2,v.y-s*0.03,s*1.6,s*0.06);
+      ctx.fillRect(v.x+s*0.6,v.y-s*0.03,s*1.6,s*0.06);
+      ctx.fillRect(v.x-s*1.4,v.y-s*0.26,s*0.06,s*0.52);
+      ctx.fillRect(v.x+s*1.4,v.y-s*0.26,s*0.06,s*0.52);
+      ctx.fillStyle='rgba(190,215,255,.8)';                                   // 지지대·안테나
+      ctx.fillRect(v.x-s*0.62,v.y-s*0.04,s*1.24,s*0.08);
+      ctx.fillRect(v.x+d*s*0.5,v.y-s*0.5,s*0.06*d,s*0.5);
+      if((v.t%1.6)<0.35){                                                     // 깜빡이는 등
+        ctx.save();
+        if(!REDUCED){ctx.shadowColor='#ff6b6b';ctx.shadowBlur=10}
+        ctx.fillStyle='#ff6b6b';
+        ctx.beginPath();ctx.arc(v.x+d*s*0.5,v.y-s*0.56,s*0.15,0,6.3);ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+  function bg(now,dt,floor){
+    if(!bgCv||bgCv.width!==Math.round(W)||Math.abs(floor-bgAtFloor)>25)paintBackdrop(floor);
     ctx.drawImage(bgCv,0,0);
-    drawStars();
-    drawPlanet();
-    updateMeteors(now,dt);
+    drawStars(); drawPlanet();
+    satsTick(now,dt); meteorsTick(now,dt);
   }
 
-  /* ---- 계단 한 칸 ----
-     윗면(밝음) + 앞면(어두움)으로 단차를 만든다. 블록 높이를 칸 간격에 맞춰
-     잘라야 계단이 "계단"으로 읽힌다 — 길게 그리면 옆 칸과 겹쳐 덩어리가 된다. */
-  function block(x,y,sc,fog){
-    var bw=sw*1.02*sc, topH=Math.max(6,sh*0.38*sc), bodyH=Math.max(4,(sh-topH/sc*0.0+3)*sc);
+  /* ---- 계단 한 칸 ---- */
+  function block(x,y,sc,fog,kind,label){
+    var top=C_TOP, lip=C_LIP;
+    if(kind===2){top=C_BEST_TOP;lip=C_BEST_LIP}
+    else if(kind===1){top=C_MILE_TOP;lip=C_MILE_LIP}
+    var bw=sw*1.02*sc, topH=Math.max(6,sh*0.38*sc), bodyH=Math.max(4,(sh+3)*sc);
     var l=Math.round(x-bw/2), w=Math.max(2,Math.round(bw));
-    ctx.fillStyle=mix(C_FRONT,C_FOG,fog);                 // 앞면 (그늘)
+    ctx.fillStyle=mix(C_FRONT,C_FOG,fog);
     ctx.fillRect(l,y,w,bodyH);
-    ctx.fillStyle=mix(C_TOP,C_FOG,fog);                   // 윗면 (빛을 받는 면)
+    ctx.fillStyle=mix(top,C_FOG,fog);
     ctx.fillRect(l,y-topH,w,topH);
-    ctx.fillStyle=mix(C_LIP,C_FOG,fog);                   // 앞쪽 모서리 하이라이트
+    ctx.fillStyle=mix(lip,C_FOG,fog);
     ctx.fillRect(l,y-Math.max(1,2*sc),w,Math.max(1,2*sc));
-    if(sc>0.45){                                          // 가까울 때만 테두리 (멀면 노이즈)
+    if(sc>0.45){
       ctx.strokeStyle=mix(C_EDGE,C_FOG,fog); ctx.lineWidth=1;
       ctx.strokeRect(l+.5,Math.round(y-topH)+.5,w-1,Math.round(topH+bodyH)-1);
+    }
+    if(label&&sc>0.62&&fog<0.5){                    // 이정표 숫자는 가까울 때만
+      ctx.fillStyle='rgba(255,255,255,'+(0.72*(1-fog)).toFixed(2)+')';
+      ctx.font='700 '+Math.round(10*sc)+'px system-ui,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(label,x,y+bodyH*0.42);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     }
   }
 
   /* ---- 캐릭터: 우주비행사 ----
-     흰 여압복 + 금색 바이저. 어두운 우주에서 대비가 가장 큰 조합이라 골랐다 —
-     이 게임은 "지금 어느 쪽을 보는가"를 순간에 읽어야 해서 대비가 곧 실력이다.
-     바이저가 머리 앞쪽으로 치우쳐 있어 그 자체가 방향 표시가 된다. */
+     방향은 두 겹으로 알린다 — ①금색 바이저가 앞으로 치우쳐 있고
+     ②등짐이 뒤로 튀어나와 실루엣이 비대칭이다. 하나만으론 작은 화면에서 안 읽힌다. */
   function hero(x,y,facing,dead,anim){
     var s=sw*0.42, f=facing;
-    /* 한 칸 오를 때 살짝 튀어오르고 착지에서 눌린다. 110ms 안에 끝나야
-       초당 6회 연타를 따라온다 (한 칸 간격이 154ms). */
     var hop=dead?0:Math.sin(anim*Math.PI), sq=1-0.14*hop, st=1+0.14*hop;
     y-=hop*sh*0.22;
     var suit=dead?'#6b7085':'#eef2ff', belt=dead?'#4e5468':'#c3cbe6',
         pack=dead?'#565b6e':'#9aa6c8', visor=dead?'#8a6a2a':'#ffb703';
     ctx.save();
     if(!dead&&!REDUCED){ctx.shadowColor='rgba(190,215,255,.45)';ctx.shadowBlur=14}
-    /* 등짐은 몸 뒤로 확실히 튀어나와야 한다. 이 비대칭이 방향을 알려주는
-       가장 큰 단서라, 살짝 겹치는 정도로는 작은 화면에서 안 보인다. */
     ctx.fillStyle=pack;
     ctx.fillRect(x-f*s*0.86,y-s*1.60*st,s*0.44*(f>0?1:-1),s*0.86*st);
-    ctx.fillStyle=dead?'#454a5c':'#7f8cb0';               // 산소통 띠
+    ctx.fillStyle=dead?'#454a5c':'#7f8cb0';
     ctx.fillRect(x-f*s*0.86,y-s*1.24*st,s*0.44*(f>0?1:-1),s*0.10);
-    ctx.fillStyle=suit;                                   // 몸 — 어깨가 앞으로 나간다
+    ctx.fillStyle=suit;
     ctx.beginPath();
     ctx.moveTo(x-f*s*0.46*sq,y);
     ctx.lineTo(x-f*s*0.46*sq,y-s*1.42*st);
@@ -583,84 +735,136 @@ function makeView(cv,G){
     ctx.lineTo(x+f*s*0.46*sq,y-s*0.2*st);
     ctx.lineTo(x+f*s*0.46*sq,y);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle=belt;                                   // 허리띠
+    ctx.fillStyle=belt;
     ctx.fillRect(x-f*s*0.46*sq,y-s*0.34*st,s*0.92*sq*(f>0?1:-1),s*0.16);
-    ctx.fillStyle=suit;                                   // 헬멧
+    ctx.fillStyle=suit;
     ctx.beginPath(); ctx.arc(x,y-s*2.12*st,s*0.62*sq,0,Math.PI*2); ctx.fill();
     ctx.restore();
-    /* 금색 바이저 = 바라보는 방향. 헬멧 앞쪽으로 뚜렷하게 치우쳐야
-       "지금 어디를 보는가"가 0.2초 안에 읽힌다. */
     ctx.fillStyle=visor;
     ctx.beginPath();
     ctx.ellipse(x+f*s*0.20,y-s*2.14*st,s*0.40*sq,s*0.34*sq,0,0,Math.PI*2);
     ctx.fill();
     if(!dead){
-      ctx.fillStyle='rgba(255,255,255,.6)';               // 바이저 반사광
+      ctx.fillStyle='rgba(255,255,255,.6)';
       ctx.beginPath(); ctx.arc(x+f*s*0.34,y-s*2.26*st,s*0.12,0,Math.PI*2); ctx.fill();
     }
   }
 
-  /* ---- 죽을 때 파편 ---- */
-  function spawnParts(x,y){
-    if(REDUCED)return;
-    var rnd=mulberry32((G.floor*7919+13)>>>0);
-    for(var i=0;i<16;i++){
-      var a=rnd()*Math.PI*2, sp=(40+rnd()*150);
-      parts.push({x:x,y:y-sh*0.6,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-90,
-                  s:2+rnd()*3.5,life:0.55+rnd()*0.35,age:0});
+  /* ---- 착지 파문 ----
+     화면 좌표가 아니라 "그 계단"에 매달아야 한다. 고정 좌표에 그리면
+     카메라가 따라오는 동안 파문만 제자리에 남아 발밑에서 떨어진다. */
+  function ringsTick(dt,baseY,cx){
+    for(var i=rings.length-1;i>=0;i--){
+      var r=rings[i]; r.age+=dt;
+      var p=r.age/0.28;
+      if(p>=1){rings.splice(i,1);continue}
+      var rr=r.f-camY, rsc=scaleAt(rr);
+      var rx=cx+(r.x-camX)*sw*rsc, ry=baseY-yOff(rr);
+      ctx.strokeStyle='rgba(127,216,255,'+((1-p)*0.55).toFixed(2)+')';
+      ctx.lineWidth=Math.max(1,2.2*(1-p));
+      ctx.beginPath();
+      ctx.ellipse(rx,ry,sw*rsc*(0.25+p*0.72),sh*rsc*(0.10+p*0.28),0,0,Math.PI*2);
+      ctx.stroke();
     }
   }
-  function drawParts(dt){
+  /* ---- 죽을 때 파편 ---- */
+  function spawnParts(x,y,gold){
+    if(REDUCED)return;
+    var rnd=mulberry32((G.floor*7919+13)>>>0);
+    for(var i=0;i<(gold?26:16);i++){
+      var a=rnd()*Math.PI*2, sp=(40+rnd()*(gold?210:150));
+      parts.push({x:x,y:y-sh*0.6,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-(gold?150:90),
+        s:2+rnd()*3.5,life:0.55+rnd()*0.45,age:0,gold:!!gold});
+    }
+  }
+  function partsTick(dt){
     for(var i=parts.length-1;i>=0;i--){
-      var p=parts[i];
-      p.age+=dt;
+      var p=parts[i]; p.age+=dt;
       if(p.age>=p.life){parts.splice(i,1);continue}
       p.vy+=520*dt; p.x+=p.vx*dt; p.y+=p.vy*dt;
-      ctx.fillStyle='rgba(214,228,255,'+(1-p.age/p.life).toFixed(2)+')';
+      var al=(1-p.age/p.life).toFixed(2);
+      ctx.fillStyle=p.gold?'rgba(255,209,102,'+al+')':'rgba(214,228,255,'+al+')';
       ctx.fillRect(p.x,p.y,p.s,p.s);
     }
+  }
+  /* ---- 게이지가 바닥나면 화면 가장자리가 붉게 맥동한다 ----
+     색만으로 알리지 않는다 — HUD의 % 숫자는 그대로 있다. */
+  function lowGaugeVignette(now){
+    if(G.dead)return;
+    var g=G.gauge;
+    if(g>32)return;
+    var sev=1-g/32;
+    var pulse=REDUCED?0.55:(0.45+0.55*Math.abs(Math.sin(now/(150+g*12))));
+    var vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.28,W/2,H/2,Math.max(W,H)*0.72);
+    vg.addColorStop(0,'rgba(255,60,90,0)');
+    vg.addColorStop(1,'rgba(255,40,70,'+(0.52*sev*pulse).toFixed(3)+')');
+    ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
   }
 
   return {
     resize:resize,
+    ripple:function(){                         // 한 칸 올랐을 때 발밑에서 퍼진다
+      if(REDUCED)return;
+      rings.push({f:G.floor,x:G.xAt(G.floor),age:0});
+      if(rings.length>6)rings.shift();
+    },
+    burst:function(){spawnParts(W/2,H*0.62,true)},   // 신기록 돌파
     draw:function(){
       if(!W||!H)resize();
       var now=nowMs(), dt=lastT?Math.min(0.05,(now-lastT)/1000):0; lastT=now;
-      if(G.floor!==seenFloor){seenFloor=G.floor;stepT=now}
+      if(G.floor!==seenFloor){
+        if(seenFloor>=0&&lastStepAt){          // 오르는 속도를 부드럽게 추적
+          var inst=1000/Math.max(60,now-lastStepAt);
+          spd+=(inst-spd)*0.35;
+        }
+        lastStepAt=now; seenFloor=G.floor; stepT=now;
+      }else if(lastStepAt&&now-lastStepAt>260){
+        spd+=(0-spd)*Math.min(1,dt*3.2);       // 멈추면 다시 줄어든다
+      }
       var anim=Math.min(1,(now-stepT)/110);
 
       var tx=G.xAt(G.floor), ty=G.floor;
       if(first){camX=tx;camY=ty;first=false}
       else{
-        /* 논리 상태는 이미 갱신됐고 그림만 따라온다 — 연타해도 입력이 씹히지 않는다 */
-        var k=REDUCED?1:0.28;
+        /* 프레임당 고정 비율로 따라가면 120Hz 화면에서 카메라가 두 배로 빨라진다.
+           경과 시간 기준으로 환산해야 어느 기기에서나 같은 속도로 따라온다. */
+        var k=REDUCED?1:(1-Math.pow(1-0.28,Math.max(0.001,dt)*60));
+        if(k>1)k=1;
         camX+=(tx-camX)*k; camY+=(ty-camY)*k;
       }
-      bg(now,dt);
+      bg(now,dt,G.floor);
+
       var baseY=H*0.62, cx=W/2;
       var lo=Math.max(0,G.floor-9), hi=G.floor+22;
-      /* 먼 것부터 그려서 가까운 것이 덮게 한다 */
+      var mark=G.mark||0;
       for(var i=hi;i>=lo;i--){
-        var r=i-camY, sc=scaleAt(r);
-        var sy=baseY-yOff(r);
+        var r=i-camY, sc=scaleAt(r), sy=baseY-yOff(r);
         if(sy<-80||sy>H+80)continue;
         var sx=cx+(G.xAt(i)-camX)*sw*sc;
         var fog=Math.max(0,Math.min(0.82,(1-sc)*1.25));
-        block(sx,sy,sc,fog);
+        var kind=0,label=null;
+        if(mark&&i===mark){kind=2;label='최고'}
+        else if(i>0&&i%100===0){kind=1;label=String(i)}
+        block(sx,sy,sc,fog,kind,label);
       }
+      ringsTick(dt,baseY,cx);
       var hr=G.floor-camY, hsc=scaleAt(hr);
       var hx=cx+(G.xAt(G.floor)-camX)*sw*hsc, hy=baseY-yOff(hr);
       hero(hx,hy,G.facing,G.dead,anim);
-      if(G.dead&&!deadSpawned){deadSpawned=true;spawnParts(hx,hy)}
+      if(G.dead&&!deadSpawned){deadSpawned=true;spawnParts(hx,hy,false)}
       if(!G.dead)deadSpawned=false;
-      if(parts.length)drawParts(dt);
+      if(parts.length)partsTick(dt);
       if(G.dead&&G.why==='wall'){
         ctx.font='700 '+Math.round(sw*0.62)+'px system-ui,sans-serif';
         ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillText('💥',hx+G.wallSide*sw*0.8,hy-sh*0.9);
+        ctx.textAlign='left'; ctx.textBaseline='alphabetic';
       }
+      lowGaugeVignette(now);
     }
   };
+  function scaleAt(r){var v=1+r*PERSP; if(v<0.18)v=0.18; var sc=1/v; return sc>1.42?1.42:sc}
+  function yOff(r){var v=1+r*PERSP; if(v<0.18)v=0.18; return (sh/PERSP)*Math.log(v)}
 }
 
 /* =========================================================================
@@ -895,6 +1099,7 @@ function playHtml(multi){
       '<div class="gwrap"><div class="gbar" id="gBar"><i id="gFill"></i></div>'+
       '<span class="gpct" id="gPct">100%</span></div>'+
     '</div>'+
+    '<button class="exit sfxBtn" id="sfxBtn" aria-label="소리 켜기 / 끄기">'+(SFX.isOn()?'🔊':'🔇')+'</button>'+
     '<button class="exit" id="exitBtn" aria-label="게임 나가기">✕</button>'+
     '<canvas id="cv"></canvas>'+
     (multi?'<div class="board" id="board"></div>':'')+
@@ -914,6 +1119,8 @@ function wirePads(onAct,onExit){
   bind($('#padUp'),'up');
   bind($('#padTurn'),'turn');
   $('#exitBtn').onclick=onExit;
+  var sb=$('#sfxBtn');
+  if(sb)sb.onclick=function(){sb.textContent=SFX.toggle()?'🔊':'🔇'};
   document.onkeydown=function(e){
     if(e.repeat)return;
     var k=e.key.toLowerCase();
@@ -933,6 +1140,24 @@ function paintHud(){
   }
   var p=$('#gPct'); if(p)p.textContent=pct+'%';
 }
+/* 한 칸 올릴 때 따라붙는 것들 — 소리·파문·이정표·신기록.
+   규칙은 G.act 가 정하고, 여기는 그 결과에 반응만 한다. */
+function actFx(a){
+  if(!G||G.dead)return;
+  var before=G.floor;
+  var ok=G.act(a);
+  if(!ok){ if(G.dead)SFX.wall(); return }
+  if(V)V.ripple();
+  if(a==='turn')SFX.turn(); else SFX.step();
+  if(G.floor%100===0)SFX.mile();
+  if(G.mark&&!G.markHit&&before<G.mark&&G.floor>=G.mark){
+    G.markHit=true;
+    SFX.record();
+    if(V)V.burst();
+    toast('신기록! 여기서부터는 처음 밟는 계단입니다');
+  }
+}
+
 function stopLoop(){if(rafId){cancelAnimationFrame(rafId);rafId=0}}
 function startLoop(onFrame){
   stopLoop();
@@ -949,24 +1174,25 @@ function startLoop(onFrame){
 function startSingle(){
   S.screen='single'; S.mode='single';
   G=makeGame((Math.random()*4294967296)>>>0);
+  G.mark=bestFloor();                 // 오르는 중에 "저기가 내 한계"가 보이게
   $('#app').innerHTML=playHtml(false);
   V=makeView($('#cv'),G); V.resize();
   wirePads(function(a){
     if(G.dead)return;
-    G.act(a);
+    actFx(a);
     if(G.dead)setTimeout(endSingle,650);
   },function(){ quitPlay(renderHome) });
   startLoop(function(){
     G.advance(nowMs());
     V.draw(); paintHud();
-    if(G.dead&&!G._ended){G._ended=1;setTimeout(endSingle,650)}
+    if(G.dead&&!G._ended){G._ended=1;if(G.why==='gauge')SFX.fade();setTimeout(endSingle,650)}
   });
   /* 탭이 숨겨져 RAF가 멈춰도 게이지는 계속 닳아야 한다 */
   clearInterval(tickT);
   tickT=setInterval(function(){
     if(S.screen!=='single'||!G)return;
     G.advance(nowMs());
-    if(G.dead&&!G._ended){G._ended=1;setTimeout(endSingle,650)}
+    if(G.dead&&!G._ended){G._ended=1;if(G.why==='gauge')SFX.fade();setTimeout(endSingle,650)}
   },500);
 }
 function quitPlay(then){
@@ -1261,7 +1487,7 @@ function beginMulti(msg){
   paintHud(); paintBoard(); V.draw();
   wirePads(function(a){
     if(!S.running||G.dead)return;
-    G.act(a);
+    actFx(a);
     if(G.dead)onMyDeath();
   },function(){ leaveRoom(); renderHome() });
 
@@ -1275,6 +1501,7 @@ function beginMulti(msg){
     else{
       clearInterval(cd);
       el.parentNode.removeChild(el);
+      SFX.go();
       runMulti();
     }
   },800);
@@ -1339,14 +1566,14 @@ function runMulti(){
   tickT=setInterval(function(){
     if(S.screen!=='play')return;
     G.advance(nowMs());
-    if(G.dead&&!G._ended){G._ended=1;onMyDeath()}
+    if(G.dead&&!G._ended){G._ended=1;if(G.why==='gauge')SFX.fade();onMyDeath()}
     pubState();
     paintBoard();
     checkEnd();
   },PUB_MS);
   startLoop(function(){
     G.advance(nowMs());
-    if(G.dead&&!G._ended){G._ended=1;onMyDeath()}
+    if(G.dead&&!G._ended){G._ended=1;if(G.why==='gauge')SFX.fade();onMyDeath()}
     V.draw(); paintHud();
   });
 }
