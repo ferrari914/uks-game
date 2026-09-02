@@ -732,16 +732,6 @@ function legacyAll(){
 function lsGet(k,d){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 
-var BADWORDS=['씨발','시발','병신','좆','새끼','개새','지랄','fuck','shit','bitch','asshole','nigg'];
-function cleanName(v){
-  return String(v||'').replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,12);
-}
-function nameError(v){
-  if(!v) return '이름을 입력해주세요.';
-  var low=v.toLowerCase().replace(/\s/g,'');
-  for(var i=0;i<BADWORDS.length;i++) if(low.indexOf(BADWORDS[i])>=0) return '사용할 수 없는 단어가 포함되어 있어요.';
-  return '';
-}
 /* ---------- 플레이어 이름 ---------- */
 /* 등재가 자동이라 게임이 끝난 뒤에 이름을 물을 자리가 없다. 그래서 시작 전에 받는다.
    이름은 공용 모듈이 보관하고 게임끼리 공유한다. */
@@ -755,12 +745,10 @@ function refreshNameUI(){
   ovName.style.display = who ? 'none' : '';
   if(!who){ ovNameErr.textContent=''; ovNameInput.value=''; focusName(); }
 }
-/* 공용 모듈은 공백 정리와 길이만 본다. 비속어 판정은 아직 테트리스에만 있어
-   여기서 먼저 거른다 (공용으로 올리는 건 게임 관리자와 협의 중). */
+/* 검사·저장 모두 공용 모듈에 맡긴다. 게임마다 기준이 다르면 같은 사람이
+   순위표에서 여러 줄로 갈라진다. */
 function saveName(){
-  var v=cleanName(ovNameInput.value), err=nameError(v);
-  if(err){ ovNameErr.textContent=err; focusName(); return false; }
-  var c=window.RANK.setName(v);
+  var c=window.RANK.setName(ovNameInput.value);
   if(!c||!c.ok){ ovNameErr.textContent=(c&&c.error)||'이름을 저장하지 못했습니다.'; focusName(); return false; }
   ovNameErr.textContent='';
   refreshNameUI();
@@ -948,8 +936,9 @@ quizClose.addEventListener('click',function(){ if(quizAnswered) finishQuiz(); el
 quizSheet.addEventListener('click',function(e){ if(e.target!==quizSheet) return; if(quizAnswered) finishQuiz(); else closeQuiz(); });
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.8.0';
+var VERSION='1.8.1';
 var CHANGELOG=[
+ {v:'1.8.1',t:['이름 검사 기준을 전 게임 공통으로 통일 — 한 게임에서 막히는 이름은 다른 게임에서도 막힌다','12자를 넘으면 말없이 자르지 않고 알려준다']},
  {v:'1.8.0',t:['판이 끝나면 자동으로 순위에 올린다 — 등록 버튼이 없어졌다','자기 기록(오늘·이번 주·역대)을 갱신했을 때만 올라간다. 그래서 한 사람이 순위표를 채우지 않는다','이름은 시작 화면에서 한 번 정한다. 다른 게임과 공유되고 언제든 바꿀 수 있다']},
  {v:'1.7.0',t:['공용 랭킹 연동 — 명예의 전당(영구)·주간·일간 3종 랭킹','주간은 월요일 0시, 일간은 매일 0시(한국 시간)에 새 순위가 시작된다. 지난 기록은 지워지지 않는다','옛 기록은 옮길 수 없어(삭제·수정 불가) 명예의 전당에 합쳐서 보여준다','같은 이름은 그 기간의 최고 기록 한 줄만 표시']},
  {v:'1.6.0',t:['부활에 성공하면 보드를 전부 비운다 (기존에는 위쪽 절반만 비워, 낙하 속도가 그대로라 금방 다시 죽었다)']},
