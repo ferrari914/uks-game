@@ -94,12 +94,10 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
 .mcard p{margin:0;color:var(--dim);font-size:13px}
 
 /* ---------- 기록 / 명예의 전당 ---------- */
-/* 공용 순위판(ranking.js)이 쓰는 색을 이 게임 테마에 맞춘다.
-   모듈 파일은 건드리지 않고 CSS 변수와 클래스만 여기서 덮어쓴다. */
+/* 공용 순위판(ranking.js)이 쓰는 색만 이 게임 테마에 맞춘다.
+   탭 크기는 모듈 기본값을 그대로 쓴다 — 여기서 덮어쓰면 나중에 모듈이
+   기본값을 바꿔도 이 게임만 안 따라가고, 왜 안 먹는지 찾게 된다. */
 #hof.rk{--rk-line:var(--line);--rk-dim:var(--dim);--rk-hi:var(--accent);--rk-me:var(--gold)}
-/* 375px 폭에서 탭 3개를 나누면 "🏆 명예의 전당"이 두 줄로 접힌다 */
-#hof .rk-tab{font-size:12.5px;padding:6px 4px;min-width:0;line-height:1.25}
-#hof .rk-tab[aria-selected="true"]{background:rgba(0,229,255,.10)}
 .rec{display:flex;align-items:baseline;gap:8px;border-top:1px solid var(--line);padding:8px 0}
 .rec:first-child{border-top:0}
 .rec .rk{width:26px;color:var(--dim);font-size:13px;flex:none}
