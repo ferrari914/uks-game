@@ -336,10 +336,31 @@
     }catch(e){ return null; }
   }
 
-  /* 이름 다듬기. 게임마다 규칙이 다르면 같은 사람이 여러 줄로 갈라진다. */
+  /* 험한 이름을 막는다. 테트리스가 쓰던 목록을 공용으로 옮긴 것이다.
+     ⚠ 이건 악의적 우회를 막는 장치가 아니다 — 우회하려는 사람은 목록을 몰라도
+        REST 로 직접 넣는다. 목적은 **평범한 사용자가 실수로 험한 이름을 올리는
+        것을 막는 것**이다. 그래서 목록이 공개돼도 잃을 게 없다.
+     ⚠ 자모 분리("ㅅㅣ발")나 유사 문자는 못 잡는다. 완벽하지 않다. */
+  var BADWORDS = ['씨발','시발','병신','좆','새끼','개새','지랄',
+                  'fuck','shit','bitch','asshole','nigg'];
+
+  /* 이름 다듬기. 게임마다 규칙이 다르면 같은 사람이 여러 줄로 갈라진다.
+     반드시 이 함수 하나만 쓸 것. */
   function cleanName(raw){
-    var n = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
-    if(!n)           return {ok:false, name:'', error:'이름을 입력해 주세요.'};
+    var n = String(raw == null ? '' : raw)
+              .replace(/[\u0000-\u001f\u007f]/g, '')   /* 제어문자 제거 */
+              .replace(/\s+/g, ' ').trim();
+    if(!n) return {ok:false, name:'', error:'이름을 입력해 주세요.'};
+
+    /* 공백을 지우고 소문자로 맞춘 뒤 본다 — "시 발" 같은 단순 회피를 잡는다 */
+    var flat = n.toLowerCase().replace(/\s/g, '');
+    for(var i=0;i<BADWORDS.length;i++){
+      if(flat.indexOf(BADWORDS[i]) >= 0){
+        return {ok:false, name:n, error:'사용할 수 없는 단어가 들어 있습니다.'};
+      }
+    }
+    /* 자르지 않고 되돌린다. 말없이 잘라 저장하면 자기가 적은 이름과
+       순위표에 뜬 이름이 달라져 더 헷갈린다. */
     if(n.length > 12) return {ok:false, name:n, error:'이름은 12자까지 쓸 수 있습니다.'};
     return {ok:true, name:n, error:''};
   }
@@ -384,9 +405,12 @@
        왜 안 올라갔지"로 읽힌다. */
     var bar = Math.min(dayBest, weekBest, allBest);
     if(sc <= bar){
+      /* 첫 판을 0점으로 끝낸 사람에게 "기존 기록(0)을 넘지 못했습니다"는
+         있지도 않은 기록을 말하는 셈이라 어색하다. */
       return Promise.resolve({
         sent:false,
-        reason:'기존 기록(' + bar.toLocaleString() + ')을 넘지 못했습니다.',
+        reason: (sc <= 0) ? '0점은 순위에 올리지 않습니다.'
+                          : '기존 기록(' + bar.toLocaleString() + ')을 넘지 못했습니다.',
         best:{day:dayBest, week:weekBest, all:allBest}
       });
     }
