@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#0a0d16">
-<meta name="description" content="한 기기를 돌려가며 즐기는 3~10인 라이어 게임. 제시어 비공개 전달·비밀 투표·라이어 추리 찬스까지.">
+<meta name="description" content="3~10인 라이어 게임. 한 기기를 돌려가며 하거나, 각자 자기 폰으로 방에 들어와 채팅으로. 제시어는 암호화돼 각자에게만 갑니다.">
 <meta property="og:title" content="라이어 게임">
-<meta property="og:description" content="한 기기를 돌려가며 즐기는 3~10인 파티 게임">
+<meta property="og:description" content="한 기기로도, 온라인으로도 즐기는 3~10인 파티 게임">
 <meta property="og:type" content="website">
 <title>라이어 게임</title>
 <style>
@@ -210,6 +210,63 @@ body{
 .hsec h4{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:4px}
 .hsec p{font-size:11.5px;line-height:1.75;color:var(--muted);word-break:keep-all}
 .hsec p b{color:var(--text)}
+/* ---- 온라인 모드 ---- */
+.tin{width:100%;background:#0d1220;border:1px solid var(--line);border-radius:9px;
+  padding:12px 11px;color:var(--text);font-family:inherit;font-size:14px;outline:none;min-width:0}
+.tin:focus{border-color:var(--accent)}
+.inrow{display:flex;gap:6px;align-items:stretch}
+.inrow .tin{flex:1}
+#netBar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:30;
+  padding:9px 12px calc(9px + env(safe-area-inset-bottom));
+  background:#3a1b2e;border-top:1px solid #7a3358;color:#ffc0d0;
+  font-size:11.5px;font-weight:700;text-align:center;line-height:1.5}
+#netBar.show{display:block}
+/* 모드 선택 카드 */
+.pick2{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:13px;
+  padding:15px 14px;font-family:inherit;cursor:pointer}
+.pick2:active{transform:translateY(1px)}
+.pick2:hover{border-color:var(--accent)}
+.pick2 b{font-size:16px;font-weight:800}
+.pick2 span{font-size:11.5px;line-height:1.65;color:var(--muted);word-break:keep-all}
+.pick2:disabled{opacity:.45;cursor:default}
+/* 참가자 스트립 */
+.pstrip{display:flex;flex-wrap:wrap;gap:4px}
+.pchip{display:inline-flex;align-items:center;gap:4px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:999px;padding:4px 9px;
+  font-size:11px;font-weight:700;color:var(--muted);max-width:100%}
+.pchip i{font-style:normal;color:var(--gold);font-weight:800}
+.pchip.now{border-color:var(--accent);color:var(--accent);background:rgba(169,123,255,.14)}
+.pchip.ok{border-color:#2f6b4e;color:#5fd6a0}
+.pchip.away{opacity:.4}
+/* 접히는 내 카드 */
+.cardfold{width:100%;background:var(--panel2);border:1px dashed var(--line);color:var(--text);
+  border-radius:11px;padding:11px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer}
+.cardfold small{color:var(--muted);font-weight:700;font-size:10.5px;margin-left:4px}
+.cardfold.open{border-style:solid;border-color:var(--accent);color:var(--accent);margin-bottom:6px}
+.rcard.mini{flex:none;padding:14px 12px;gap:6px}
+.rcard.mini .word{font-size:26px}
+.rcard.mini .liarT{font-size:22px}
+/* 채팅 로그 */
+.clog{flex:1;min-height:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:9px;display:flex;flex-direction:column;gap:5px}
+.cm{font-size:13px;line-height:1.6;word-break:break-word;background:var(--panel2);
+  border-radius:9px;padding:7px 9px}
+.cm b{display:block;font-size:10.5px;font-weight:800;color:var(--muted);margin-bottom:2px}
+.cm b i{font-style:normal;color:var(--accent);font-weight:700}
+.cm.mine{background:rgba(169,123,255,.13)}
+.cm.say{border-left:3px solid var(--accent)}
+.cm.sys{background:transparent;color:var(--muted);font-size:11px;text-align:center;
+  font-weight:700;padding:3px 0}
+.cm.sys.ok{color:var(--cy)}
+.cm.sys.bad{color:#ff7a9e}
+#scOnGame{gap:7px}
+#ogAct{gap:7px}
+#ogAct .pan{padding:9px 11px}
+#ogAct .picks,#ogAct .opts{max-height:34vh;overflow-y:auto}
+#ogAct .tally{max-height:34vh;overflow-y:auto}
+#ogAct .rlist,#ogAct .score{max-height:26vh;overflow-y:auto}
 @media (max-height:660px){
   .cover .em{font-size:42px}
   .cover h3{font-size:19px}
@@ -230,8 +287,30 @@ body{
 
   <div id="main">
 
-    <!-- ========== 설정 ========== -->
-    <section class="sc show" id="scSetup">
+    <!-- ========== 모드 선택 ========== -->
+    <section class="sc show" id="scHome">
+      <div class="pan">
+        <div class="ptRow">
+          <div class="pt">🕵️ 라이어 게임</div>
+          <button class="verBtn" id="verBtn2" aria-label="버전 기록 보기">v<span id="verNow3">-</span></button>
+        </div>
+        <p class="lead">한 명만 제시어를 모릅니다.<br>어떻게 하시겠어요?</p>
+      </div>
+      <div class="pan" style="gap:7px">
+        <button class="pick2" id="modeLocal">
+          <b>📱 한 기기로</b>
+          <span>한자리에 모여 폰 한 대를 돌려가며. 설명과 토론은 사람이 직접 말로 합니다. (3~10명)</span>
+        </button>
+        <button class="pick2" id="modeOnline">
+          <b>🌐 온라인으로</b>
+          <span>각자 자기 폰으로 방에 들어와 채팅으로. 제시어는 암호화돼 각자에게만 갑니다. (3~10명)</span>
+        </button>
+      </div>
+      <div class="foot"><button class="btn ghost" id="rulesBtn2">규칙 보기</button></div>
+    </section>
+
+    <!-- ========== 설정 (패스 앤 플레이) ========== -->
+    <section class="sc" id="scSetup">
       <div class="pan">
         <div class="ptRow">
           <div class="pt">🕵️ 라이어 게임</div>
@@ -315,6 +394,7 @@ body{
       <div class="foot">
         <button class="btn" id="startBtn">게임 시작</button>
         <button class="btn ghost" id="rulesBtn">규칙 보기</button>
+        <button class="btn ghost" id="toHome">모드 선택으로</button>
       </div>
     </section>
 
@@ -389,8 +469,28 @@ body{
       </div>
     </section>
 
+    <!-- ========== 온라인: 입장 ========== -->
+    <section class="sc" id="scOnHome">
+      <div id="ohBody" style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0"></div>
+    </section>
+
+    <!-- ========== 온라인: 대기실 ========== -->
+    <section class="sc" id="scOnLobby">
+      <div id="olBody" style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0"></div>
+    </section>
+
+    <!-- ========== 온라인: 게임 ========== -->
+    <section class="sc" id="scOnGame">
+      <div id="ogTop"></div>
+      <div id="ogCard"></div>
+      <div class="clog" id="ogChat"></div>
+      <div class="foot" id="ogAct"></div>
+    </section>
+
   </div>
 </div>
+
+<div id="netBar"></div>
 
 <!-- 버전 기록 -->
 <div class="sheet" id="verSheet">
@@ -427,6 +527,14 @@ body{
         라이어 역전승 → 라이어(+스파이) 각 <b>+1</b><br>
         시민 승리 → 시민 각 <b>+1</b><br>
         라이어를 정확히 지목한 시민 → 추가 <b>+1</b></p></div>
+      <div class="hsec"><h4>온라인 모드</h4><p>
+        방장이 <b>방 코드 6자</b>를 만들면 친구들이 그 코드로 들어옵니다. 설명과 토론은 <b>채팅</b>으로 하고,
+        설명 라운드에서는 <b>자기 차례에만</b> 입력창이 열립니다.<br>
+        제시어와 투표는 <b>각자의 키로 암호화</b>되어 오갑니다 — 브라우저 개발자도구로 통신을 들여다봐도
+        남의 카드는 읽을 수 없습니다.<br>
+        <b>다만 방장은 정답과 라이어를 알 수 있습니다.</b> 서버 없이 방장 브라우저가 배정을 하기 때문입니다.
+        공정한 판이 필요하면 대기실에서 <b>방장 참가 → 진행만 한다</b>를 켜세요.<br>
+        온라인 모드는 <b>https 주소</b>에서만 열립니다(암호화 때문). 파일을 직접 열면 한 기기 모드만 됩니다.</p></div>
       <div class="hsec"><h4>팁</h4><p>
         시민은 <b>너무 구체적으로</b> 설명하면 라이어에게 제시어를 알려주는 셈입니다.
         반대로 너무 애매하면 라이어로 의심받습니다.</p></div>
@@ -483,6 +591,8 @@ const WORDS = {
     "손오공","김연아","손흥민","박지성","유재석","백종원","아인슈타인","에디슨","나폴레옹","셜록 홈즈"]
 };
 var CATS = Object.keys(WORDS);
+/* 온라인 모드(online.js)도 같은 제시어 풀을 쓴다. 데이터를 두 벌 두면 반드시 어긋난다. */
+window.LIAR_WORDS = WORDS;
 
 /* ================= 유틸 ================= */
 var $=function(s){return document.querySelector(s);};
@@ -535,7 +645,7 @@ var state=null;
 var round=0;
 
 /* ================= 화면 전환 ================= */
-var PHASE_NAME={setup:'설정',reveal:'역할 확인',describe:'설명 라운드',debate:'토론',
+var PHASE_NAME={home:'모드 선택',setup:'설정',reveal:'역할 확인',describe:'설명 라운드',debate:'토론',
   vote:'비밀 투표',tally:'개표',guess:'라이어 추리',result:'결과'};
 /* 기기를 넘길 때 가리는 커버 화면 — 역할 확인·투표·라이어 추리가 같은 구조를 쓴다.
    비밀 유지의 핵심 장치이므로 구현을 한 곳에 모은다. */
@@ -669,8 +779,15 @@ document.addEventListener('click',function(e){
 });
 $('#resetScore').onclick=function(){scores={};renderSetupScore();saveStore();};
 /* ================= 버전 기록 ================= */
-var VERSION='1.0.1';
+var VERSION='1.1.0';
 var CHANGELOG=[
+ {v:'1.1.0',t:['온라인 멀티 모드 추가 — 각자 자기 폰으로 방에 들어와 채팅으로 한 판',
+               '첫 화면에서 「한 기기로」 / 「온라인으로」 선택 (한 기기 모드는 그대로)',
+               '방 코드 6자로 입장, 3~10명, 방장이 주제·모드·바퀴·시간을 설정',
+               '제시어·역할·투표를 참가자별 공개키로 종단 암호화 — 같은 방 사람도 남의 카드를 못 읽는다',
+               '설명 라운드는 자기 차례에만 입력창이 열리는 채팅, 이어서 자유 토론 → 비밀 투표 → 개표 → 추리',
+               '「방장은 진행만 하기」 옵션 — 배정을 방장 브라우저가 하므로 방장은 정답을 알 수 있다',
+               '온라인 모드는 https 주소에서만 열린다 (암호화 제약). 한 기기 모드는 어디서나 그대로']},
  {v:'1.0.1',t:['버전 기록 버튼 추가 (첫 화면 제목 오른쪽)',
                '허브 복귀·규칙 버튼의 터치 영역을 44px로 넓히고 접근성 이름(aria-label) 추가',
                '코드 정리 — 기기를 넘길 때 나오는 커버 화면 3벌을 하나로 통합']},
@@ -690,11 +807,15 @@ function renderVer(){
 }
 $('#verNow').textContent=VERSION;
 $('#verNow2').textContent=VERSION;
-$('#verBtn').onclick=function(){renderVer();$('#verSheet').classList.add('show');};
+$('#verNow3').textContent=VERSION;
+$('#verBtn').onclick=$('#verBtn2').onclick=function(){renderVer();$('#verSheet').classList.add('show');};
 $('#verX').onclick=$('#verX2').onclick=function(){$('#verSheet').classList.remove('show');};
 $('#verSheet').onclick=function(e){if(e.target===this)this.classList.remove('show');};
 
-$('#rulesBtn').onclick=function(){$('#helpSheet').classList.add('show');};
+/* 모드 선택 — 「한 기기로」만 여기서 처리한다. 「온라인으로」는 online.js가 잡는다. */
+$('#modeLocal').onclick=function(){show('setup');};
+$('#toHome').onclick=function(){show('home');};
+$('#rulesBtn').onclick=$('#rulesBtn2').onclick=function(){$('#helpSheet').classList.add('show');};
 $('#helpBtn').onclick=function(){$('#helpSheet').classList.add('show');};
 $('#helpX').onclick=$('#helpX2').onclick=function(){$('#helpSheet').classList.remove('show');};
 $('#startBtn').onclick=function(){cfg.names=readNames();saveStore();newRound(true);};
@@ -1150,9 +1271,13 @@ renderNames();
 renderCats();
 renderSegs();
 renderSetupScore();
-show('setup');
+show('home');
 
 })();
 </script>
+<!-- 온라인 멀티 모드. 패스 앤 플레이는 위 인라인 스크립트만으로 완결되므로,
+     아래 두 파일이 없거나 로드에 실패해도 한 기기 모드는 그대로 동작한다. -->
+<script src="net.js"></script>
+<script src="online.js"></script>
 </body>
 </html>
