@@ -128,7 +128,7 @@
     n = n || 20;
     /* 같은 이름을 접으므로 넉넉히 받아온 뒤 잘라낸다. 딱 n개만 받으면
        한 사람이 상위를 채웠을 때 20위까지 못 채운다. */
-    var fetchN = keepDupes ? n : Math.min(300, n * 4);
+    var fetchN = keepDupes ? n : Math.min(300, n * 10);
     var qs;
     if(scope === 'day' || scope === 'week'){
       var field  = (scope === 'day') ? 'dk' : 'wk';
@@ -312,8 +312,99 @@
     document.head.appendChild(s);
   }
 
+  /* =======================================================================
+     이름 · 자동 등재
+     -----------------------------------------------------------------------
+     기록은 수정도 삭제도 안 된다. 그래서 게임이 끝날 때마다 무조건 올리면
+     한 사람이 하루에 수백 줄을 쌓는다. 그러면 순위표를 뽑을 때 그 사람
+     기록만 받아와 20위를 못 채운다.
+
+     그래서 **자기 기록을 갱신했을 때만** 올린다. 사용자가 보기에는 자동이고,
+     쌓이는 것은 의미 있는 기록뿐이다. 기준은 세 개다 — 오늘 최고, 이번 주
+     최고, 역대 최고. 셋 중 하나라도 넘으면 올린다(기록 하나가 세 랭킹에
+     전부 들어가므로 한 번만 쓰면 된다).
+
+     ⚠ 기준은 이 기기에만 남는다. 다른 기기에서 처음 하면 한 번 더 올라가고,
+        그건 순위판이 이름으로 접어 준다. 로그인이 없는 한 이게 최선이다.
+     ======================================================================= */
+  var LS_NAME = 'rank.name';
+
+  function ls(k, v){
+    try{
+      if(v === undefined) return localStorage.getItem(k);
+      localStorage.setItem(k, v); return v;
+    }catch(e){ return null; }
+  }
+
+  /* 이름 다듬기. 게임마다 규칙이 다르면 같은 사람이 여러 줄로 갈라진다. */
+  function cleanName(raw){
+    var n = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+    if(!n)           return {ok:false, name:'', error:'이름을 입력해 주세요.'};
+    if(n.length > 12) return {ok:false, name:n, error:'이름은 12자까지 쓸 수 있습니다.'};
+    return {ok:true, name:n, error:''};
+  }
+
+  function name(){ return ls(LS_NAME) || ''; }
+
+  function setName(raw){
+    var c = cleanName(raw);
+    if(c.ok) ls(LS_NAME, c.name);
+    return c;
+  }
+
+  /* 같은 사람으로 묶는 기준. 대소문자·공백 차이로 갈라지지 않게 한다. */
+  function nameKey(n){ return String(n||'').toLowerCase(); }
+
+  function bestKey(game, who){ return 'rank.best.' + game + '.' + nameKey(who); }
+
+  function readBest(game, who){
+    try{ return JSON.parse(ls(bestKey(game, who)) || '{}') || {}; }catch(e){ return {}; }
+  }
+
+  /* 자동 등재. 갱신했을 때만 실제로 보낸다.
+     반환: {sent, reason, best:{day,week,all}, rec?} — reason 은 화면에 그대로 써도 된다. */
+  function autoSubmit(game, score, opts){
+    opts = opts || {};
+    var who = opts.name || name();
+    var c = cleanName(who);
+    if(!c.ok) return Promise.resolve({sent:false, reason:'이름이 없어 순위에 올리지 않았습니다.', best:null});
+
+    var ts = opts.ts || Date.now();
+    var sc = Math.round(Number(score) || 0);
+    var dk = dayOf(ts), wk = weekOf(ts);
+    var b  = readBest(game, c.name);
+
+    /* 날짜가 바뀌었으면 그 칸의 기준은 없는 것과 같다 */
+    var dayBest  = (b.dk === dk) ? (b.day  || 0) : 0;
+    var weekBest = (b.wk === wk) ? (b.week || 0) : 0;
+    var allBest  = b.all || 0;
+
+    /* 셋 중 하나만 넘어도 올린다 = 가장 낮은 문턱만 넘으면 된다.
+       안내에도 그 문턱을 보여줘야 한다. 역대 최고를 보여주면 "오늘 1등인데
+       왜 안 올라갔지"로 읽힌다. */
+    var bar = Math.min(dayBest, weekBest, allBest);
+    if(sc <= bar){
+      return Promise.resolve({
+        sent:false,
+        reason:'기존 기록(' + bar.toLocaleString() + ')을 넘지 못했습니다.',
+        best:{day:dayBest, week:weekBest, all:allBest}
+      });
+    }
+
+    return submit(game, {name:c.name, score:sc, ts:ts, extra:opts.extra}).then(function(r){
+      ls(bestKey(game, c.name), JSON.stringify({
+        dk:dk, wk:wk,
+        day: Math.max(dayBest, sc), week: Math.max(weekBest, sc), all: Math.max(allBest, sc)
+      }));
+      return {sent:true, reason:'순위에 올렸습니다.', id:r.id, rec:r.rec,
+              best:{day:Math.max(dayBest,sc), week:Math.max(weekBest,sc), all:Math.max(allBest,sc)}};
+    });
+  }
+
   window.RANK = {
     submit: submit,
+    autoSubmit: autoSubmit,
+    name: name, setName: setName, cleanName: cleanName,
     top: top,
     board: board,
     keys: function(ts){ return {dk: dayOf(ts), wk: weekOf(ts)}; },
