@@ -98,6 +98,11 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    탭 크기는 모듈 기본값을 그대로 쓴다 — 여기서 덮어쓰면 나중에 모듈이
    기본값을 바꿔도 이 게임만 안 따라가고, 왜 안 먹는지 찾게 된다. */
 #hof.rk{--rk-line:var(--line);--rk-dim:var(--dim);--rk-hi:var(--accent);--rk-me:var(--gold)}
+.rankmsg{margin-top:6px}
+.rankmsg.on{color:var(--gold)}
+.namecard .cardHead{align-items:center}
+.btn.sm{width:auto;min-height:44px;padding:0 12px;font-size:13px}
+.mcard[disabled]{opacity:.4;pointer-events:none}
 .rec{display:flex;align-items:baseline;gap:8px;border-top:1px solid var(--line);padding:8px 0}
 .rec:first-child{border-top:0}
 .rec .rk{width:26px;color:var(--dim);font-size:13px;flex:none}
@@ -189,8 +194,12 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    ========================================================================= */
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.5.0';
+var VERSION='1.6.0';
 var CHANGELOG=[
+ {v:'1.6.0',t:['기록이 자동으로 랭킹에 올라간다 — 등록 버튼을 없앴다',
+               '시작 전에 이름을 한 번만 적으면 된다 (다른 게임에서 적었으면 그대로 쓴다)',
+               '한 사람당 한 줄만 남는다 — 자기 기록을 갱신했을 때만 올라간다',
+               '멀티에서 죽었을 때의 층수도 같은 기준으로 올라간다']},
  {v:'1.5.0',t:['순위표에 기간이 생겼다 — 명예의 전당 · 주간 · 일간',
                '같은 이름은 그 기간의 최고 기록 하나만 보여준다 (한 사람이 도배하지 않도록)',
                '전체 순위는 예전 명예의 전당 그대로다']},
@@ -249,7 +258,10 @@ function esc(s){return String(s).replace(/[&<>"']/g,function(m){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
 function rid(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s='';
   for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s}
-function cleanName(s){
+/* 통신으로 받은 남의 이름을 화면에 쓰기 전 소독한다.
+   ⚠ 사용자가 입력한 이름을 다듬는 것은 RANK.cleanName 이다 — 섞지 말 것.
+      게임마다 규칙이 다르면 같은 사람이 순위표에서 여러 줄로 갈라진다. */
+function peerName(s){
   var t=String(s||'').replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ ]/g,'').trim().slice(0,8);
   return t||'익명';
 }
@@ -327,8 +339,9 @@ var SFX=(function(){
   };
 })();
 
-function getNick(){return store.get('stairs.nick','')}
-function setNick(v){store.set('stairs.nick',v)}
+/* 이름은 공용 랭킹 모듈이 들고 있다 (localStorage 'rank.name').
+   게임마다 따로 저장하면 테트리스에서 적은 이름과 갈라진다. */
+function myName(){ return window.RANK ? RANK.name() : '' }
 
 /* 내 기록 — 오프라인에서도 항상 동작하는 주력 기록 */
 function myRecords(){
@@ -930,7 +943,7 @@ function makeNet(){
 var S={
   screen:'home',
   mode:'single',
-  pid:rid(8), name:getNick(), code:'', isHost:false,
+  pid:rid(8), name:'', code:'', isHost:false,
   net:null, netState:'idle',
   peers:{},          // pid -> {n,f,a,seen}
   roster:null,       // 시작 시점에 확정된 참가자 (방장이 뿌린다)
@@ -973,9 +986,43 @@ function wireVer(){
 /* =========================================================================
    첫 화면
    ========================================================================= */
-function renderHome(){
+/* 이름은 시작 전에 받는다 — 자동 등재라 끝난 뒤에 물을 자리가 없다.
+   이미 적어둔 이름이 있으면(다른 게임에서 적었어도) 곧장 시작시킨다. */
+function nameCardHtml(editing){
+  var nm=myName();
+  if(nm&&!editing){
+    return '<div class="card namecard">'+
+      '<div class="cardHead"><h2>🙋 '+esc(nm)+'</h2><div class="grow"></div>'+
+      '<button class="btn ghost sm" id="nameEdit" aria-label="이름 바꾸기">이름 바꾸기</button></div>'+
+      '<p class="tiny" style="margin:0">이 이름으로 랭킹에 자동으로 올라갑니다.</p></div>';
+  }
+  return '<div class="card namecard">'+
+    '<div class="cardHead"><h2>🙋 이름을 적어주세요</h2></div>'+
+    '<label class="lbl" for="nameIn">랭킹에 올라갈 이름 (최대 12자)</label>'+
+    '<input type="text" id="nameIn" maxlength="12" value="'+esc(nm)+'" placeholder="이름" '+
+      'autocomplete="off" enterkeyhint="done">'+
+    '<p class="tiny" id="nameErr" style="color:var(--warn);min-height:18px;margin:6px 0 0"></p>'+
+    '<button class="btn" id="nameSave">저장하고 시작하기</button>'+
+    '<p class="tiny">이름을 적어야 게임을 시작할 수 있습니다. 기록은 이 이름으로 '+
+    '<b>자동으로 랭킹에 올라갑니다</b> — 한 사람당 한 줄만 남습니다.</p></div>';
+}
+function wireNameCard(repaint){
+  var save=$('#nameSave'), inp=$('#nameIn'), edit=$('#nameEdit');
+  if(edit)edit.onclick=function(){repaint(true)};
+  if(!save)return;
+  function commit(){
+    var c=RANK?RANK.setName(inp.value):{ok:false,error:'랭킹 모듈을 불러오지 못했습니다.'};
+    if(!c.ok){ $('#nameErr').textContent=c.error; inp.focus(); return }
+    S.name=c.name; repaint(false);
+  }
+  save.onclick=commit;
+  inp.onkeydown=function(e){ if(e.key==='Enter'){e.preventDefault();commit()} };
+}
+
+function renderHome(editingName){
   S.screen='home';
-  var best=bestFloor();
+  S.name=myName();
+  var best=bestFloor(), ready=!!S.name&&!editingName;
   $('#app').innerHTML=
   '<div class="wrap">'+
     '<div class="topbar">'+
@@ -986,26 +1033,25 @@ function renderHome(){
     '<h1>무한의 <span class="em">계단</span></h1>'+
     '<p class="lead">버튼은 둘뿐이다. 다음 계단이 보는 방향과 같으면 <b>오르기</b>, 반대면 <b>방향 전환</b>.<br>'+
       '멈추면 체력이 닳는다 — 그대로 서 있으면 죽는다.</p>'+
+    nameCardHtml(editingName)+
     (best?'<div class="card"><div class="cardHead"><h2>🏅 내 최고 기록</h2></div>'+
       '<div class="big">'+best+'<small>층</small></div></div>':'')+
-    '<button class="mcard" id="mSingle" aria-label="싱글플레이 — 혼자 올라 최고 층수에 도전">'+
+    '<button class="mcard" id="mSingle"'+(ready?'':' disabled')+
+      ' aria-label="싱글플레이 — 혼자 올라 최고 층수에 도전">'+
       '<h4>🧍 싱글플레이</h4><p>혼자 오른다. 어디까지 갈 수 있는지.</p></button>'+
-    '<button class="mcard" id="mMulti" aria-label="멀티플레이 — 여럿이 동시에 올라 한 명 남을 때까지">'+
+    '<button class="mcard" id="mMulti"'+(ready?'':' disabled')+
+      ' aria-label="멀티플레이 — 여럿이 동시에 올라 한 명 남을 때까지">'+
       '<h4>🌐 멀티플레이</h4><p>2~8인이 같은 계단을 동시에. 한 명 남을 때까지.</p></button>'+
     '<button class="mcard" id="mHof" aria-label="랭킹 — 명예의 전당·주간·일간 순위표 보기">'+
       '<h4>🏆 랭킹</h4><p>명예의 전당 · 주간 · 일간 순위와 내 기록.</p></button>'+
   '</div>';
   wireVer();
-  $('#mSingle').onclick=function(){startSingle()};
-  $('#mMulti').onclick=renderMultiEntry;
+  wireNameCard(renderHome);
+  $('#mSingle').onclick=function(){ if(ready)startSingle() };
+  $('#mMulti').onclick=function(){ if(ready)renderMultiEntry() };
   $('#mHof').onclick=renderHof;
 }
 
-/* =========================================================================
-   명예의 전당 화면
-   ★ 여기가 죽어도 게임은 온전해야 한다. 로딩은 전부 비동기이고,
-     실패해도 "내 기록"은 그대로 뜬다. 게임 시작 경로와 완전히 분리돼 있다.
-   ========================================================================= */
 /* 순위판은 공용 모듈이 통째로 그린다 — 탭 3개, 질의, 초기화 시각 안내,
    같은 이름 접기, 실패 처리까지 전부 그 안에 있다.
    여기서는 자리를 만들고 RANK.board 를 부르기만 한다. */
@@ -1160,14 +1206,23 @@ function startSingle(){
 function quitPlay(then){
   stopLoop(); unwirePads(); clearInterval(tickT); tickT=0; G=null; V=null; then();
 }
+/* 기록을 자동으로 올린다. 게임이 끝날 때마다 무조건 쓰면 한 사람이 하루에
+   수백 줄을 쌓고 순위표가 그 사람으로만 채워진다(기록은 지울 수도 없다).
+   그래서 모듈이 "오늘·이번 주·역대 중 하나라도 갱신했을 때"만 실제로 보낸다.
+   사용자가 보기엔 자동이고, 쌓이는 건 의미 있는 기록뿐이다. */
+function autoRank(floor,onDone){
+  if(!window.RANK||!(floor>0))return onDone&&onDone(null);
+  RANK.autoSubmit('stairs',floor).then(function(r){onDone&&onDone(r)})
+    ['catch'](function(){onDone&&onDone({sent:false,reason:'순위에 올리지 못했습니다.'})});
+}
+
 function endSingle(){
   if(S.screen!=='single')return;
   var floor=G.floor, why=G.why;
   stopLoop(); unwirePads(); clearInterval(tickT); tickT=0;
   addRecord(floor,'single');
   S.screen='over';
-  var submitted=false, myId=null;
-  var best=bestFloor();
+  var best=bestFloor(), rank={state:'ing', msg:'순위 확인 중…', id:null};
   function paint(){
     if(S.screen!=='over')return;
     $('#app').innerHTML=
@@ -1179,40 +1234,25 @@ function endSingle(){
       '<div class="card"><div class="cardHead"><h2>이번 기록</h2></div>'+
         '<div class="big">'+floor+'<small>층</small></div>'+
         '<p class="tiny">최고 기록 '+best+'층'+(floor>=best&&floor>0?' — <b style="color:var(--gold)">신기록!</b>':'')+'</p>'+
+        '<p class="tiny rankmsg'+(rank.state==='sent'?' on':'')+'">'+esc(rank.msg)+'</p>'+
       '</div>'+
       '<div class="row"><button class="btn" id="again">다시 도전</button>'+
         '<button class="btn ghost" id="home2">첫 화면</button></div>'+
-      '<div class="card">'+
-        (!submitted&&floor>0&&rankReady()?
-          '<label class="lbl" for="hofNick">이름 (최대 8자)</label>'+
-          '<input type="text" id="hofNick" maxlength="8" value="'+esc(S.name)+'" placeholder="이름">'+
-          '<div style="height:10px"></div>'+
-          '<button class="btn" id="hofGo">🏆 랭킹에 등록</button>'+
-          '<div style="height:14px"></div>':'')+
-        hofSlot()+rankLimitNote()+
-      '</div>'+
+      '<div class="card">'+hofSlot()+rankLimitNote()+'</div>'+
       '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
     '</div>';
     wireVer();
     $('#home').onclick=renderHome; $('#home2').onclick=renderHome;
     $('#again').onclick=function(){startSingle()};
-    drawBoard(myId);
-    var go=$('#hofGo');
-    if(go)go.onclick=function(){
-      var nm=cleanName($('#hofNick').value);
-      setNick(nm); S.name=nm;
-      go.disabled=true; go.textContent='등록 중…';
-      RANK.submit('stairs',{name:nm,score:floor}).then(function(r){
-        submitted=true; myId=r&&r.id;
-        toast('랭킹에 등록했습니다');
-        paint();                       /* 다시 그리면 순위판도 새로 읽는다 */
-      })['catch'](function(e){
-        toast('등록하지 못했습니다');
-        go.disabled=false; go.textContent='🏆 랭킹에 등록';
-      });
-    };
+    drawBoard(rank.id);
   }
   paint();
+  autoRank(floor,function(r){
+    if(!r)             rank={state:'skip', msg:'이름이 없어 순위에 올리지 않았습니다.', id:null};
+    else if(r.sent)    rank={state:'sent', msg:'🏆 '+r.reason, id:r.id||null};
+    else               rank={state:'skip', msg:r.reason, id:null};
+    paint();                       /* 다시 그리면 순위판도 새로 읽는다 */
+  });
 }
 
 /* =========================================================================
@@ -1220,6 +1260,7 @@ function endSingle(){
    ========================================================================= */
 function renderMultiEntry(){
   S.screen='multi';
+  S.name=myName();          /* 방에서 쓰는 이름도 랭킹 이름과 같은 것을 쓴다 */
   var pre=(location.hash||'').replace('#','').toUpperCase().slice(0,5);
   $('#app').innerHTML=
   '<div class="wrap">'+
@@ -1229,9 +1270,8 @@ function renderMultiEntry(){
     '<h1>🌐 멀티플레이</h1>'+
     '<p class="lead">2~8인이 <b>완전히 같은 계단</b>을 동시에 오른다. 한 명 남을 때까지, 층수 제한 없이.</p>'+
     '<div class="card">'+
-      '<label class="lbl" for="nm">내 이름 (최대 8자)</label>'+
-      '<input type="text" id="nm" maxlength="8" value="'+esc(S.name)+'" placeholder="이름">'+
-      '<div style="height:12px"></div>'+
+      '<p class="tiny" style="margin:0 0 12px">이 방에서 쓸 이름: <b>'+esc(S.name)+'</b> '+
+      '<span class="pill">첫 화면에서 바꿀 수 있습니다</span></p>'+
       '<button class="btn" id="create">방 만들기</button>'+
     '</div>'+
     '<div class="card">'+
@@ -1248,11 +1288,9 @@ function renderMultiEntry(){
   wireVer();
   $('#back').onclick=renderHome;
   $('#create').onclick=function(){
-    S.name=cleanName($('#nm').value); setNick(S.name);
     enterRoom(rid(5),true);
   };
   $('#join').onclick=function(){
-    S.name=cleanName($('#nm').value); setNick(S.name);
     var c=String($('#cd').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
     if(c.length<5)return toast('방 코드 5자를 입력하세요');
     enterRoom(c,false);
@@ -1393,7 +1431,7 @@ function onMsg(m){
   if(m.t==='hi'){
     if(m.pid===S.pid)return;
     var p=S.peers[m.pid]||(S.peers[m.pid]={n:'',f:0,a:1,seen:0});
-    p.n=cleanName(m.n); p.seen=t;
+    p.n=peerName(m.n); p.seen=t;
     return;
   }
   if(m.t==='room'){
@@ -1413,7 +1451,7 @@ function onMsg(m){
   if(m.t==='s'){
     if(m.pid===S.pid)return;
     var q=S.peers[m.pid]||(S.peers[m.pid]={n:'',f:0,a:1,seen:0});
-    q.n=cleanName(m.n||q.n);
+    q.n=peerName(m.n||q.n);
     if(typeof m.f==='number'&&m.f>q.f)q.f=Math.floor(m.f);
     if(m.a===0)q.a=0;
     q.seen=t;
@@ -1440,7 +1478,7 @@ function beginMulti(msg){
   var t=nowMs();
   S.peers={}; S.deadSeq={}; S.deadN=0;
   S.roster.forEach(function(p){
-    if(p.pid!==S.pid)S.peers[p.pid]={n:cleanName(p.n),f:0,a:1,seen:t};
+    if(p.pid!==S.pid)S.peers[p.pid]={n:peerName(p.n),f:0,a:1,seen:t};
   });
   G=makeGame(S.seed);
   $('#app').innerHTML=playHtml(true)+'<div class="count" id="cnt">3</div>';
@@ -1470,6 +1508,9 @@ function beginMulti(msg){
 function onMyDeath(){
   /* 죽는 순간에는 즉시 알린다 — 순위표가 400ms 늦게 갱신되면 억울하다 */
   pubState(); setTimeout(pubState,180);
+  /* 멀티 기록도 자동 등재한다. 같은 게임의 같은 층수인데 모드에 따라
+     순위에 못 들어가면 납득이 안 된다. */
+  autoRank(G.floor,function(r){ if(r&&r.sent)toast('🏆 '+r.reason) });
   var pads=document.querySelector('.pads');
   if(pads)pads.innerHTML='<div class="pad" style="display:flex;align-items:center;justify-content:center;opacity:.75">'+
     '관전 중 · 내 기록 <b style="color:var(--accent);margin:0 4px">'+G.floor+'층</b></div>';
@@ -1496,11 +1537,11 @@ function multiStates(){
       out.push({pid:S.pid,n:S.name,f:G?G.floor:0,alive:al,me:true});
     }else{
       var q=S.peers[p.pid];
-      if(!q)q={n:cleanName(p.n),f:0,a:1,seen:t};
+      if(!q)q={n:peerName(p.n),f:0,a:1,seen:t};
       var gone=(t-q.seen)>GONE_MS;
       var al2=!!q.a&&!gone;
       if(!al2)markDead(p.pid);
-      out.push({pid:p.pid,n:q.n||cleanName(p.n),f:q.f,alive:al2,me:false,gone:gone&&!!q.a});
+      out.push({pid:p.pid,n:q.n||peerName(p.n),f:q.f,alive:al2,me:false,gone:gone&&!!q.a});
     }
   });
   out.sort(function(a,b){
