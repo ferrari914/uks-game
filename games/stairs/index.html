@@ -194,8 +194,9 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    ========================================================================= */
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.6.0';
+var VERSION='1.6.1';
 var CHANGELOG=[
+ {v:'1.6.1',t:['다른 탭을 보고 있을 때 멀티가 시작되면 그 사람만 게임이 안 시작되던 문제 수정']},
  {v:'1.6.0',t:['기록이 자동으로 랭킹에 올라간다 — 등록 버튼을 없앴다',
                '시작 전에 이름을 한 번만 적으면 된다 (다른 게임에서 적었으면 그대로 쓴다)',
                '한 사람당 한 줄만 남는다 — 자기 기록을 갱신했을 때만 올라간다',
@@ -468,7 +469,9 @@ function makeView(cv,G){
 
   function resize(){
     dpr=Math.min(2,window.devicePixelRatio||1);
-    W=cv.clientWidth; H=cv.clientHeight;
+    var w=cv.clientWidth, h=cv.clientHeight;
+    if(!(w>0&&h>0)){ W=0; H=0; return }   /* 아직 배치 전이거나 탭이 숨겨져 있다 */
+    W=w; H=h;
     cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
     ctx.setTransform(dpr,0,0,dpr,0,0);
     var k=Math.min(1.25,Math.max(.78,W/390));
@@ -584,8 +587,10 @@ function makeView(cv,G){
     }
   }
   function drawPlanet(){
+    if(!(W>0&&H>0))return;
     var pr=Math.min(W,H)*0.17, pcx=W*0.80;
     var pcy=H*0.17 + ((camY*sh*0.035)%(H*1.6));
+    if(!isFinite(pcy))pcy=H*0.17;
     if(pcy>H+pr)pcy-=H*1.6;
     var pg=ctx.createRadialGradient(pcx-pr*0.4,pcy-pr*0.4,pr*0.1,pcx,pcy,pr);
     pg.addColorStop(0,'#6d7fb8'); pg.addColorStop(0.55,'#2d3560'); pg.addColorStop(1,'#12142a');
@@ -790,6 +795,11 @@ function makeView(cv,G){
     burst:function(){spawnParts(W/2,H*0.62,true)},   // 신기록 돌파
     draw:function(){
       if(!W||!H)resize();
+      /* 탭이 숨겨져 있으면 clientWidth/Height 가 0이라 캔버스 크기도 0이 된다.
+         그대로 그리면 H*1.6 으로 나누는 곳에서 NaN 이 나와 예외로 죽는다.
+         멀티에서 이게 터지면 beginMulti 가 중간에 끊겨 그 사람만 시작을 못 한다 —
+         대기실에서 다른 탭을 보고 있다가 방장이 시작하면 실제로 일어난다. */
+      if(!W||!H)return;
       var now=nowMs(), dt=lastT?Math.min(0.05,(now-lastT)/1000):0; lastT=now;
       if(G.floor!==seenFloor){
         if(seenFloor>=0&&lastStepAt){          // 오르는 속도를 부드럽게 추적
@@ -1654,7 +1664,12 @@ function renderMultiOver(){
    ========================================================================= */
 window.addEventListener('hashchange',function(){});
 /* 탭을 떠난 동안에도 게이지는 실제 시계로 닳는다 (G.advance).
-   돌아왔을 때 이미 죽어 있으면 그대로 결과로 넘어간다 — 멈추면 죽는다. */
+   돌아왔을 때 이미 죽어 있으면 그대로 결과로 넘어간다 — 멈추면 죽는다.
+   그리고 숨은 동안에는 캔버스 크기가 0이라 그리기를 건너뛰었으므로,
+   돌아오면 크기를 다시 잡아준다. */
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&V)V.resize();
+});
 renderHome();
 </script>
 </body>
