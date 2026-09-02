@@ -124,8 +124,11 @@
   /* ---- 조회 ----
      scope: 'all' 명예의 전당 · 'week' 주간 · 'day' 일간
      when:  다른 날짜/주를 보고 싶을 때 넘기는 시각(ms). 없으면 지금.     */
-  function top(game, scope, n, when){
+  function top(game, scope, n, when, keepDupes){
     n = n || 20;
+    /* 같은 이름을 접으므로 넉넉히 받아온 뒤 잘라낸다. 딱 n개만 받으면
+       한 사람이 상위를 채웠을 때 20위까지 못 채운다. */
+    var fetchN = keepDupes ? n : Math.min(300, n * 4);
     var qs;
     if(scope === 'day' || scope === 'week'){
       var field  = (scope === 'day') ? 'dk' : 'wk';
@@ -133,14 +136,14 @@
       qs = 'orderBy=' + q(field) +
            '&startAt=' + q(bucket + '|') +
            '&endAt='   + q(bucket + '|' + HIGH) +
-           '&limitToLast=' + n;
+           '&limitToLast=' + fetchN;
     }else{
-      qs = 'orderBy=' + q('score') + '&limitToLast=' + n;
+      qs = 'orderBy=' + q('score') + '&limitToLast=' + fetchN;
     }
-    return get(url(game, qs)).then(function(obj){ return toList(obj, n); });
+    return get(url(game, qs)).then(function(obj){ return toList(obj, n, keepDupes); });
   }
 
-  function toList(obj, n){
+  function toList(obj, n, keepDupes){
     var out = [], k;
     if(obj) for(k in obj){
       var v = obj[k];
@@ -149,6 +152,20 @@
     }
     /* 점수 높은 순. 같으면 먼저 세운 쪽이 위 */
     out.sort(function(a,b){ return (b.score - a.score) || ((a.ts||0) - (b.ts||0)); });
+
+    /* 한 사람이 여러 줄을 차지하면 순위표가 "누가 잘하나"가 아니라
+       "누가 많이 했나"가 된다. 같은 이름은 최고 기록 한 줄만 남긴다.
+       ⚠ 이름은 신원이 아니다 — 다른 사람이 같은 이름을 쓰면 합쳐진다.
+          로그인이 없는 한 피할 수 없다. 화면에 그 사실을 적어 둘 것. */
+    if(!keepDupes){
+      var seen = {}, uniq = [];
+      for(var j=0;j<out.length;j++){
+        var key = String(out[j].name||'');
+        if(seen[key]) continue;
+        seen[key] = 1; uniq.push(out[j]);
+      }
+      out = uniq;
+    }
     out = out.slice(0, n);
     for(var i=0;i<out.length;i++) out[i].rank = i + 1;
     return out;
@@ -202,7 +219,7 @@
       sub.textContent = meta.sub + (k==='all' ? '' : ' · 다음 초기화 ' + human(nextReset(k)));
       body.innerHTML = '<p class="rk-msg">불러오는 중…</p>';
 
-      top(game, k, n).then(function(list){
+      top(game, k, n, null, opts.keepDupes).then(function(list){
         if(cur !== k) return;                     /* 그새 탭을 바꿨으면 버린다 */
         if(!list.length){
           body.innerHTML = '<p class="rk-msg">' +
@@ -210,13 +227,15 @@
             '</p>';
           return;
         }
+        var note = opts.keepDupes ? '' :
+          '<p class="rk-msg" style="margin-top:10px">같은 이름은 그 기간의 최고 기록 하나만 표시합니다.</p>';
         body.innerHTML = '<ol class="rk-list">' + list.map(function(r){
           return '<li class="rk-row' + (opts.me && r.id===opts.me ? ' rk-me' : '') + '">' +
                    '<span class="rk-no">' + r.rank + '</span>' +
                    '<span class="rk-nm">' + esc(r.name) + '</span>' +
                    '<span class="rk-sc">' + esc(fmt(r.score, r.raw)) + '</span>' +
                  '</li>';
-        }).join('') + '</ol>';
+        }).join('') + '</ol>' + note;
       }).catch(function(e){
         if(cur !== k) return;
         body.innerHTML = '<p class="rk-msg rk-err">' + esc(e.message) + '</p>';
