@@ -61,7 +61,9 @@ var SC_DRAWER=20;         // 출제자: 맞힌 사람 1명당
 var HINT_STEPS=[0.6,0.3];
 
 /* 드로잉 */
-var CW=800, CH=600;       // 논리 캔버스 크기
+var CW=800, CH=600;       // 논리 캔버스 크기 (표시 크기와 무관 — 좌표는 항상 이 기준)
+var COARSE_MAX=900;       // 이 폭 이하이거나 손가락 입력이면 모바일로 본다
+var GRIP_GAIN_MAX=4;      // 스크롤 그립 감도 상한
 var D_BATCH_MS=80;        // 배치 전송 주기
 var D_MAX_PAIRS=40;       // 배치 한 개당 좌표쌍 상한
 var D_MIN_DIST=2;         // 논리좌표 2px 미만 이동은 버린다
@@ -127,24 +129,51 @@ function near1(a,b){
   return diff<=1;
 }
 function nowSync(){ return Date.now()+S.offset }
+/* 상태는 최소 1.2초마다 다시 날아오지만 화면이 실제로 바뀌는 일은 드물다.
+   내용이 같으면 innerHTML을 건드리지 않는다 — 문자열 비교가 DOM 재생성보다 훨씬 싸다.
+   바꿨을 때만 true를 돌려주므로, 핸들러 재부착도 이 값으로 판단하면 된다. */
+/* 클래스 토글도 값이 바뀔 때만 만진다. */
+function setFlag(el,cls,on){
+  if(!el)return;
+  on=!!on;
+  var k='__f_'+cls;
+  if(el[k]===on)return;
+  el[k]=on; el.classList.toggle(cls,on);
+}
+function setHTML(el,html){
+  if(!el)return false;
+  if(el.__h===html)return false;
+  el.__h=html; el.innerHTML=html;
+  return true;
+}
 
 /* ===================== 제시어 데이터 ===================== */
 function wordsOk(){ return !!(window.CM_WORDS && window.CM_WORDS.length) }
+/* words.js는 정적 데이터라 결과가 변하지 않는다. 대기실은 1.2초마다 다시 그려지므로
+   400개를 매번 훑지 않도록 한 번만 계산해 둔다. */
+var _catsCache=null;
 function allCats(){
-  if(window.CM_CATEGORIES && window.CM_CATEGORIES.length)return window.CM_CATEGORIES.slice();
+  if(_catsCache)return _catsCache;
+  if(window.CM_CATEGORIES && window.CM_CATEGORIES.length)return (_catsCache=window.CM_CATEGORIES.slice());
   var seen={},out=[];
   (window.CM_WORDS||[]).forEach(function(w){ if(w&&w.c&&!seen[w.c]){seen[w.c]=1;out.push(w.c)} });
-  return out;
+  return (_catsCache=out);
 }
+/* 같은 조건이면 결과가 같다. 시작 가능 여부 검사(startReason)가 대기실에서 계속 도는데,
+   매번 400개를 필터링할 이유가 없다. 반환된 배열은 읽기 전용으로만 쓴다. */
+var _poolKey='', _poolCache=null;
 function wordPool(cfg){
+  var key=cfg.diff+'|'+(cfg.cats||[]).join(',');
+  if(_poolCache&&key===_poolKey)return _poolCache;
   var cats={},any=!cfg.cats||!cfg.cats.length;
   (cfg.cats||[]).forEach(function(c){cats[c]=1});
-  return (window.CM_WORDS||[]).filter(function(w){
+  _poolKey=key;
+  return (_poolCache=(window.CM_WORDS||[]).filter(function(w){
     if(!w||!w.w)return false;
     if(cfg.diff!=='all' && String(w.d)!==String(cfg.diff))return false;
     if(!any && !cats[w.c])return false;
     return true;
-  });
+  }));
 }
 
 /* ===================== 상태 ===================== */
@@ -158,10 +187,9 @@ var S={
   pid:rid(12,'abcdefghijklmnopqrstuvwxyz0123456789'),
   code:'', tid:'', isHost:false,
   net:'idle', err:'', offset:0, lastState:0, lastPub:0, hop:0, hopAt:0,
-  chat:[], chatSeen:{}, lastSent:0,
+  chat:[], lastSent:0,
   myWord:null, myCands:null,            // 출제자 본인만 아는 정보
-  ovlKey:'', seenTurn:'', syncedTurn:'',
-  team:'red'
+  ovlKey:'', seenTurn:'', syncedTurn:''
 };
 var V=null;              // 방장이 뿌린 최신 상태
 var G=null;              // 방장 전용 권위 상태
@@ -172,7 +200,8 @@ var hostTimer=null, uiTimer=null, pingTimer=null;
 var DRAW={
   strokes:[], cur:null, out:[], timer:null,
   color:COLORS[0], width:WIDTHS[1], eraser:false,
-  last:null, lastSnap:0, ctx:null, cv:null, dpr:1
+  hasLast:false, lastX:0, lastY:0, lastSnap:0, ctx:null, cv:null, dpr:1,
+  locked:false, scrollY:0
 };
 
 /* ===================== 토픽 ===================== */
@@ -326,8 +355,8 @@ function createRoom(){
     S.isHost=true;
     G={ gno:0, phase:'lobby', players:{}, cfg:loadCfg(),
         order:[], rd:0, ti:0, tk:'', drawer:null,
-        cands:null, wordIdx:-1, word:null, used:{},
-        endsAt:0, dur:0, hintN:0, revealed:[], solvers:[],
+        cands:null, word:null, used:{},
+        endsAt:0, dur:0, revealed:[], solvers:[],
         rev:null, fin:null, dirty:true, lastPub:0,
         netLost:false, grace:0 };            // 방장 회선이 끊긴 동안 참가자 판정을 멈추기 위한 것
     NET.sub(tC(),onClientEvent);
@@ -382,7 +411,7 @@ function leaveRoom(silent){
   hostTimer=uiTimer=pingTimer=DRAW.timer=null;
   G=null; V=null;
   S.code=''; S.tid=''; S.isHost=false; S.myWord=null; S.myCands=null;
-  S.chat=[]; S.chatSeen={}; S.ovlKey=''; S.seenTurn=''; S.syncedTurn=''; S.hop=0; S.hopAt=0; S.lastState=0; S.lastPub=0;
+  S.chat=[]; S.ovlKey=''; S.seenTurn=''; S.syncedTurn=''; S.hop=0; S.hopAt=0; S.lastState=0; S.lastPub=0;
   DRAW.strokes=[]; DRAW.cur=null; DRAW.out=[]; DRAW.ctx=null; DRAW.cv=null;
   hideOvl();
   if(location.hash)history.replaceState(null,'',location.pathname);
@@ -593,7 +622,7 @@ function beginTurn(){
   G.drawer=G.order[G.ti];
   G.tk=G.gno+'_'+G.rd+'_'+G.ti;
   G.phase='pick'; G.dur=PICK_MS; G.endsAt=Date.now()+PICK_MS;
-  G.word=null; G.wordIdx=-1; G.revealed=[]; G.hintN=0; G.solvers=[]; G.rev=null;
+  G.word=null; G.revealed=[]; G.solvers=[]; G.rev=null;
   for(var k in G.players){ G.players[k].ok=false; G.players[k].gain=0 }
 
   G.cands=pick3();
@@ -611,9 +640,9 @@ function pick3(){
 function confirmWord(i){
   if(!G.cands||!G.cands.length)return;
   var idx=clamp(i|0,0,G.cands.length-1);
-  G.wordIdx=idx; G.word=G.cands[idx]; G.used[G.word.w]=1;
+  G.word=G.cands[idx]; G.used[G.word.w]=1;
   G.phase='draw'; G.dur=G.cfg.tl*1000; G.endsAt=Date.now()+G.dur;
-  G.revealed=[]; G.hintN=0; G.solvers=[];
+  G.revealed=[]; G.solvers=[];
   sendPriv(G.drawer,{t:'go',tk:G.tk,i:idx,word:G.word});
   sysAll(nameOf(G.drawer)+'님이 그리기 시작했습니다.','');
   G.dirty=true; publish(true);
@@ -870,6 +899,7 @@ function applyView(){
   paintNav();
 }
 function render(){
+  unlockScroll();                                // 화면이 바뀌는데 잠금이 남아 있으면 안 된다
   hideOvl();
   if(S.screen==='home')renderHome();
   else if(S.screen==='lobby')renderLobby();
@@ -877,8 +907,7 @@ function render(){
   paintNav();
 }
 function paintNav(){
-  if(!S.code){ navmid.innerHTML=''; return }
-  navmid.innerHTML='방 <b>'+esc(S.code)+'</b>'+(S.isHost?' · 방장':'');
+  setHTML(navmid, S.code?('방 <b>'+esc(S.code)+'</b>'+(S.isHost?' · 방장':'')):'');
 }
 function amDrawer(){ return !!(V&&V.drawer&&V.drawer===S.pid) }
 function myRow(){
@@ -912,9 +941,7 @@ function renderLobby(){
 
   '<div class="card" id="hostbox"></div>'+
 
-  '<div class="card"><h3>대기실 채팅</h3><div class="chatlog" id="clog"></div>'+
-  '<div class="chatin"><input type="text" id="cmsg" maxlength="'+CHAT_MAX+'" placeholder="메시지" autocomplete="off">'+
-  '<button class="btn btn-main" id="csend">전송</button></div></div>'+
+  '<div class="card"><h3>대기실 채팅</h3>'+chatHTML('메시지')+'</div>'+
 
   '<button class="btn btn-ghost" id="lv" style="width:100%;margin-top:16px">방 나가기</button>'+
   '<p class="note">방장이 창을 닫으면 방이 닫힙니다. 게임 도중 들어온 사람은 관전하다가 다음 라운드부터 참가합니다.</p>'+
@@ -943,7 +970,7 @@ function paintLobby(){
   if(!V)return;
   var pl=document.getElementById('pl'); if(!pl)return;
   document.getElementById('pc').textContent=V.players.length+' / '+MAX_PLAYERS+'명';
-  pl.innerHTML=V.players.map(function(p){
+  setHTML(pl, V.players.map(function(p){
     var cls=p.pid===V.host?' host':'';
     if(V.mode==='team')cls+=' '+p.team;
     return '<div class="pchip'+cls+'"><span class="av">'+esc(p.e)+'</span><span>'+esc(p.n)+'</span>'+
@@ -951,29 +978,27 @@ function paintLobby(){
       (p.away?'<span class="tag" style="color:var(--warn)">자리 비움</span>':'')+
       (p.pid===V.host?'<span class="tag">👑 방장</span>':'')+
       (p.pid===S.pid?'<span class="tag">나</span>':'')+'</div>';
-  }).join('');
+  }).join(''));
 
   var ts=document.getElementById('tsel');
   if(V.mode==='team'){
     var me=myRow(), mine=me?me.team:'red';
-    ts.innerHTML='<div class="teamsel">'+
+    var built=setHTML(ts,'<div class="teamsel">'+
       '<button type="button" class="red" data-t="red" aria-pressed="'+(mine==='red')+'">🔴 레드팀</button>'+
       '<button type="button" class="blue" data-t="blue" aria-pressed="'+(mine==='blue')+'">🔵 블루팀</button></div>'+
-      '<p class="hintline">팀전은 4명 이상, 양 팀 인원이 같아야 시작합니다. 출제자의 같은 팀원만 정답을 맞힐 수 있습니다.</p>';
-    ts.querySelector('.teamsel').onclick=function(e){
+      '<p class="hintline">팀전은 4명 이상, 양 팀 인원이 같아야 시작합니다. 출제자의 같은 팀원만 정답을 맞힐 수 있습니다.</p>');
+    if(built)ts.querySelector('.teamsel').onclick=function(e){   // 다시 만들었을 때만 붙인다
       var b=e.target.closest('button'); if(!b)return;
       if(S.isHost){ G.players[S.pid].team=b.dataset.t; G.dirty=true; publish(true) }
       else NET.pub(tC(),{t:'team',pid:S.pid,team:b.dataset.t});
     };
-  }else ts.innerHTML='';
+  }else setHTML(ts,'');
 
   var hb=document.getElementById('hostbox');
   if(S.isHost&&G)paintHostBox(hb);
-  else{
-    hb.innerHTML='<h3>대기 중</h3><p style="color:var(--muted);font-size:13.5px;line-height:1.7">'+
+  else setHTML(hb,'<h3>대기 중</h3><p style="color:var(--muted);font-size:13.5px;line-height:1.7">'+
       '<b>'+(V.mode==='team'?'⚔️ 팀전':'🎯 개인전')+'</b> · '+V.rounds+'라운드 · 라운드당 '+V.tl+'초<br>'+
-      '방장이 시작하면 첫 차례가 바로 시작합니다.</p>';
-  }
+      '방장이 시작하면 첫 차례가 바로 시작합니다.</p>');
 }
 function paintHostBox(hb){
   var cats=allCats();
@@ -981,6 +1006,13 @@ function paintHostBox(hb){
   var allOn=!G.cfg.cats.length;
   var n=Object.keys(G.players).length;
   var reason=startReason();
+
+  /* 설정 패널은 버튼이 수십 개라 만드는 것 자체가 비싸다. 화면에 영향을 주는 값이
+     그대로면 문자열조차 만들지 않고 넘어간다. */
+  var key=G.cfg.mode+'|'+G.cfg.rounds+'|'+G.cfg.tl+'|'+G.cfg.diff+'|'+
+          (G.cfg.cats||[]).join(',')+'|'+G.cfg.hint+'|'+n+'|'+reason+'|'+cats.length;
+  if(hb.__k===key)return;
+  hb.__k=key;
 
   hb.innerHTML='<h3>게임 설정</h3>'+
    '<label class="lbl">모드</label><div class="opt wide" id="o_mode">'+
@@ -1049,7 +1081,11 @@ function renderGame(){
   '<div class="gamegrid">'+
   '<div class="gcol players-col"><h4>참가자</h4><div class="plist" id="plist"></div></div>'+
   '<div class="gcol canvas-col">'+
-    '<div class="cvwrap"><canvas id="cv"></canvas><div class="cvlock" id="cvlock"></div></div>'+
+    '<div class="cvrow">'+
+      '<div class="cvwrap"><canvas id="cv"></canvas><div class="cvlock" id="cvlock"></div></div>'+
+      '<div class="scrollgrip" id="sgrip" role="scrollbar" aria-label="화면 스크롤" aria-controls="app">'+
+        '<span class="ar">▲</span><span class="lbl">스크롤</span><span class="ar">▼</span></div>'+
+    '</div>'+
     '<div class="tools" id="tools">'+
       '<div class="swatches" id="sw">'+
       COLORS.map(function(c,i){
@@ -1069,9 +1105,7 @@ function renderGame(){
       '<div class="toolnote">글자·숫자를 쓰지 마세요. 그림으로만 표현해 주세요.</div>'+
     '</div>'+
   '</div>'+
-  '<div class="gcol chat-col"><h4>채팅 · 정답</h4><div class="chatlog" id="clog"></div>'+
-  '<div class="chatin"><input type="text" id="cmsg" maxlength="'+CHAT_MAX+'" placeholder="정답을 입력하세요" autocomplete="off">'+
-  '<button class="btn btn-main" id="csend">전송</button></div></div>'+
+  '<div class="gcol chat-col"><h4>채팅 · 정답</h4>'+chatHTML('정답을 입력하세요')+'</div>'+
   '</div>'+
   '<button class="btn btn-ghost" id="lv" style="width:100%;margin-top:16px;font-size:13px">방 나가기</button>';
 
@@ -1079,6 +1113,7 @@ function renderGame(){
   bindChat();
   initCanvas();
   bindTools();
+  bindGrip();
   clearInterval(uiTimer); uiTimer=setInterval(tickUI,UI_MS);
   paintGame(); paintChat();
 }
@@ -1106,10 +1141,10 @@ function paintGame(){
   if(!V||!document.getElementById('hrd'))return;
   var dr=drawerRow(), me=myRow(), iAm=amDrawer();
 
-  document.getElementById('hrd').innerHTML=
+  setHTML(document.getElementById('hrd'),
     (V.ph==='final'?'<b>게임 종료</b>'
      :'라운드 <b>'+V.rd+' / '+V.rounds+'</b> · <b>'+V.ti+'</b>번째 차례 / '+V.tt)+
-    (dr?' · 출제자 '+esc(dr.e)+' <b>'+esc(dr.n)+'</b>':'');
+    (dr?' · 출제자 '+esc(dr.e)+' <b>'+esc(dr.n)+'</b>':''));
 
   /* 제시어 줄 */
   var wcat=document.getElementById('wcat'), wmask=document.getElementById('wmask'), wsub=document.getElementById('wsub');
@@ -1134,7 +1169,7 @@ function paintGame(){
   }
 
   /* 참가자 목록 */
-  document.getElementById('plist').innerHTML=V.players.map(function(p){
+  setHTML(document.getElementById('plist'), V.players.map(function(p){
     var cls='pl';
     if(p.pid===S.pid)cls+=' me';
     if(p.pid===V.drawer)cls+=' drawer';
@@ -1148,11 +1183,18 @@ function paintGame(){
         :p.pid===V.drawer?'<span class="bdg d">그리는 중</span>'
         :p.ok?'<span class="bdg o">정답</span>':'')+
       '<span class="sc">'+p.sc+'</span></div>';
-  }).join('');
+  }).join(''));
 
   /* 캔버스 잠금 · 도구바 */
   var tools=document.getElementById('tools'), lock=document.getElementById('cvlock');
-  tools.classList.toggle('on',iAm&&V.ph==='draw');
+  var drawing=iAm&&V.ph==='draw';
+  tools.classList.toggle('on',drawing);
+  /* 지금 그릴 수 있을 때만 캔버스가 터치를 삼킨다. 맞히는 사람에게는 캔버스 위에서도
+     페이지가 평소처럼 스크롤돼야 한다(죽은 구역 방지). */
+  setFlag(DRAW.cv,'drawable',drawing);
+  /* 출제자는 캔버스가 터치를 삼키니 옆에 스크롤 그립을 준다. 모바일에서만. */
+  setFlag(document.getElementById('sgrip'),'on',drawing&&isCoarse());
+  if(!drawing)unlockScroll();
   var lockMsg='';
   if(V.ph==='pick')lockMsg=iAm?'제시어를 고르는 중…':(dr?dr.n+'님이 제시어를 고르는 중…':'');
   else if(V.ph==='final')lockMsg='게임이 끝났습니다.';
@@ -1277,6 +1319,12 @@ function buildFinalOvl(){
 }
 
 /* ===================== 채팅 ===================== */
+/* 대기실과 게임 화면이 같은 채팅 UI를 쓴다. 안내 문구만 다르므로 마크업은 한 곳에서 만든다. */
+function chatHTML(ph){
+  return '<div class="chatlog" id="clog"></div>'+
+    '<div class="chatin"><input type="text" id="cmsg" maxlength="'+CHAT_MAX+'" placeholder="'+ph+'" autocomplete="off">'+
+    '<button class="btn btn-main" id="csend">전송</button></div>';
+}
 function bindChat(){
   var inp=document.getElementById('cmsg'), btn=document.getElementById('csend');
   if(!inp||!btn)return;
@@ -1337,7 +1385,8 @@ function clearSurface(){
   DRAW.ctx.restore();
 }
 function resetCanvas(){
-  DRAW.strokes=[]; DRAW.cur=null; DRAW.out=[]; DRAW.last=null;
+  DRAW.strokes=[]; DRAW.cur=null; DRAW.out=[]; DRAW.hasLast=false;
+  unlockScroll();
   clearSurface();
 }
 function redrawAll(){
@@ -1365,19 +1414,38 @@ function paintStroke(st){
   st.dn=p.length;
 }
 function canDraw(){ return amDrawer()&&V&&V.ph==='draw' }
-function ptOf(e){
-  var r=DRAW.cv.getBoundingClientRect();
-  return { x:r3(clamp((e.clientX-r.left)/r.width,0,1)), y:r3(clamp((e.clientY-r.top)/r.height,0,1)) };
+/* 손가락 입력 환경인가. PC에서는 아래 잠금·그립 코드가 아예 돌지 않아야 한다. */
+function isCoarse(){
+  try{ if(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches)return true }catch(e){}
+  return window.innerWidth<=COARSE_MAX;
+}
+/* touch-action을 무시하는 브라우저(카톡 인앱 WebView 등)가 있어서, 그리는 동안에는
+   페이지를 position:fixed로 물리적으로 붙잡아 둔다. 모바일에서만 건다. */
+function lockScroll(){
+  if(DRAW.locked||!isCoarse())return;
+  DRAW.locked=true;
+  DRAW.scrollY=window.scrollY||window.pageYOffset||0;
+  document.body.style.top=(-DRAW.scrollY)+'px';
+  document.body.classList.add('drawlock');
+}
+/* 반드시 원래 스크롤 위치로 되돌린다. 안 그러면 그릴 때마다 화면이 맨 위로 튄다. */
+function unlockScroll(){
+  if(!DRAW.locked)return;
+  DRAW.locked=false;
+  document.body.classList.remove('drawlock');
+  document.body.style.top='';
+  window.scrollTo(0,DRAW.scrollY);
 }
 function onDown(e){
   if(!canDraw())return;
   e.preventDefault();
+  lockScroll();                                  // 레이아웃이 흔들리지 않는 방식이라 좌표는 그대로다
   try{ DRAW.cv.setPointerCapture(e.pointerId) }catch(err){}
   DRAW.cur={c:DRAW.color,w:DRAW.width,e:DRAW.eraser,p:[],dn:0};
   DRAW.strokes.push(DRAW.cur); trimStrokes();
   queue({t:'s',c:DRAW.cur.c,w:DRAW.cur.w,e:DRAW.cur.e});
-  DRAW.last=null;
-  addPoint(ptOf(e));
+  DRAW.hasLast=false;
+  addPointFrom(e,DRAW.cv.getBoundingClientRect());
 }
 function onMove(e){
   if(!canDraw()||!DRAW.cur)return;
@@ -1387,24 +1455,31 @@ function onMove(e){
   var evs=null;
   try{ if(e.getCoalescedEvents)evs=e.getCoalescedEvents() }catch(err){}
   if(!evs||!evs.length)evs=[e];
-  for(var i=0;i<evs.length;i++)addPoint(ptOf(evs[i]));
+  /* getBoundingClientRect는 레이아웃을 강제로 계산시킨다. 합쳐진 이벤트가 수십 개씩
+     들어오므로 점마다 부르면 안 된다 — 이벤트 한 번에 한 번만 읽어 돌려쓴다. */
+  var r=DRAW.cv.getBoundingClientRect();
+  for(var i=0;i<evs.length;i++)addPointFrom(evs[i],r);
 }
 function onUp(e){
+  unlockScroll();                                // cur가 없어도(취소 등) 잠금은 반드시 푼다
   if(!DRAW.cur)return;
-  DRAW.cur=null; DRAW.last=null;
+  DRAW.cur=null; DRAW.hasLast=false;
   queue({t:'e'});
   flush();
 }
-function addPoint(pt){
+/* 화면 좌표 → 0~1 정규화(소수 3자리). 점마다 {x,y} 객체를 만들지 않는다. */
+function addPointFrom(e,r){
   var st=DRAW.cur; if(!st)return;
-  if(DRAW.last){
-    var dx=(pt.x-DRAW.last.x)*CW, dy=(pt.y-DRAW.last.y)*CH;
+  var x=r3(clamp((e.clientX-r.left)/r.width,0,1));
+  var y=r3(clamp((e.clientY-r.top)/r.height,0,1));
+  if(DRAW.hasLast){
+    var dx=(x-DRAW.lastX)*CW, dy=(y-DRAW.lastY)*CH;
     if(dx*dx+dy*dy<D_MIN_DIST*D_MIN_DIST)return;      // 2px 미만은 버린다
   }
-  DRAW.last=pt;
-  st.p.push(pt.x,pt.y);
+  DRAW.hasLast=true; DRAW.lastX=x; DRAW.lastY=y;
+  st.p.push(x,y);
   paintStroke(st);
-  queuePoint(pt.x,pt.y);
+  queuePoint(x,y);
 }
 /* 전송 큐: 마지막 항목이 좌표 배치면 이어 붙이고, 40쌍을 넘으면 새 배치를 연다 */
 function queuePoint(x,y){
@@ -1442,7 +1517,10 @@ function applyDraw(d){
   }else if(d.t==='p'){
     var st=DRAW.strokes[DRAW.strokes.length-1];
     if(!st)return;
-    st.p=st.p.concat(d.p||[]);
+    /* concat은 배치마다 스트로크 전체를 새 배열로 복사한다 — 선이 길수록 비싸진다.
+       뒤에 덧붙이기만 하면 되므로 push로 바꾼다. */
+    var dp=d.p||[];
+    for(var i=0;i<dp.length;i++)st.p.push(dp[i]);
     paintStroke(st);
   }else if(d.t==='clr'){
     DRAW.strokes=[]; clearSurface();
@@ -1476,6 +1554,36 @@ function sendSnapshot(){
     if(total>D_MAX_SNAP_PTS){ ss=ss.slice(i+1); break }
   }
   NET.pub(tD(),{u:S.pid,ms:[{t:'snap',ss:ss}]});
+}
+/* 출제자는 캔버스가 터치를 삼키므로 캔버스 옆 그립으로 페이지를 스크롤한다.
+   그립은 캔버스 바깥이라 그리기 영역을 잡아먹지 않고, 여기서의 드래그는 그림이 되지 않는다. */
+function bindGrip(){
+  var g=document.getElementById('sgrip'); if(!g)return;
+  var dragging=false, pid=null, startY=0, startScroll=0, gain=1;
+  g.addEventListener('pointerdown',function(e){
+    e.preventDefault(); e.stopPropagation();
+    dragging=true; pid=e.pointerId;
+    startY=e.clientY;
+    startScroll=window.scrollY||window.pageYOffset||0;
+    /* 그립을 끝까지 훑으면 페이지도 끝까지 가도록 이동량을 환산한다(스크롤바 손잡이와 같은 감각) */
+    var max=Math.max(1,(document.documentElement.scrollHeight||0)-window.innerHeight);
+    gain=Math.max(1,Math.min(GRIP_GAIN_MAX,max/Math.max(1,g.offsetHeight)));
+    try{ g.setPointerCapture(pid) }catch(err){}
+    g.classList.add('act');
+  });
+  g.addEventListener('pointermove',function(e){
+    if(!dragging||e.pointerId!==pid)return;
+    e.preventDefault(); e.stopPropagation();
+    window.scrollTo(0,startScroll+(e.clientY-startY)*gain);
+  });
+  function end(e){
+    if(!dragging)return;
+    dragging=false; g.classList.remove('act');
+    try{ g.releasePointerCapture(pid) }catch(err){}
+  }
+  g.addEventListener('pointerup',end);
+  g.addEventListener('pointercancel',end);
+  g.addEventListener('pointerleave',end);
 }
 /* 도구바 */
 function bindTools(){

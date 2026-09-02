@@ -78,7 +78,6 @@ button.btn{font-size:15px;font-weight:700;font-family:var(--font);border:none;bo
 button.btn:active{transform:translateY(1px)}
 button.btn:disabled{opacity:.35;cursor:not-allowed}
 .btn-main{background:var(--accent)}
-.btn-pink{background:var(--accent-2);color:#fff}
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
 .note{font-size:11.5px;color:var(--muted-2);line-height:1.7;margin-top:var(--s3)}
 .err{color:var(--bad);font-size:13px;margin-top:var(--s2);min-height:18px;line-height:1.5}
@@ -152,17 +151,36 @@ button.btn:disabled{opacity:.35;cursor:not-allowed}
 .pl .bdg.o{background:var(--ok);color:#08130c}
 .pl .bdg.a{background:var(--warn);color:#1a1405}
 .pl.away{opacity:.6}
-.pl.away .nm{text-decoration:none}
 .pl.tred{box-shadow:inset 3px 0 0 var(--red)}
 .pl.tblue{box-shadow:inset 3px 0 0 var(--blue)}
 
+/* 캔버스와 (모바일 전용) 스크롤 그립을 나란히 둔다.
+   PC에서는 그립이 display:none이라 캔버스가 예전과 똑같이 한 줄을 다 쓴다. */
+.cvrow{display:flex;gap:var(--s2);align-items:stretch}
 .cvwrap{position:relative;background:#fff;border-radius:12px;overflow:hidden;aspect-ratio:4/3;
-  border:1px solid var(--line)}
-#cv{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  border:1px solid var(--line);flex:1;min-width:0}
+/* touch-action:none을 무조건 걸면 그리지 않는 사람에게 캔버스가 "스크롤 죽은 구역"이 된다.
+   지금 그릴 수 있을 때(.drawable)만 잠근다. */
+#cv{display:block;width:100%;height:100%;touch-action:auto;cursor:crosshair}
+#cv.drawable{touch-action:none}
+/* 그리는 동안 페이지를 물리적으로 고정한다 (touch-action을 무시하는 WebView 대비).
+   top은 JS가 -scrollY로 넣고, 손을 떼면 그 값으로 정확히 되돌린다. */
+body.drawlock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
+/* 출제자용 스크롤 그립 — 모바일에서 내가 출제자일 때만 보인다 */
+.scrollgrip{display:none}
 .cvlock{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
   background:rgba(10,11,18,.72);color:var(--text);font-size:14px;text-align:center;padding:var(--s4);
   line-height:1.7;backdrop-filter:blur(2px)}
 .cvlock.on{display:flex}
+@media(max-width:900px){
+  .scrollgrip.on{display:flex;flex:0 0 44px;width:44px;touch-action:none;cursor:grab;
+    flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    background:var(--bg-2);border:1px solid var(--line-2);border-radius:12px;
+    color:var(--muted);font-size:11px;letter-spacing:.02em;user-select:none;-webkit-user-select:none}
+  .scrollgrip.on .ar{font-size:13px;line-height:1;color:var(--accent)}
+  .scrollgrip.on .lbl{writing-mode:vertical-rl;text-orientation:upright;letter-spacing:.1em}
+  .scrollgrip.on.act{background:var(--card-2);border-color:var(--accent);cursor:grabbing}
+}
 .tools{margin-top:var(--s3);display:none;flex-direction:column;gap:var(--s2)}
 .tools.on{display:flex}
 .swatches{display:flex;flex-wrap:wrap;gap:6px}
