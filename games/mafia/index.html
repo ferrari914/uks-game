@@ -125,6 +125,24 @@ body.over{background-image:radial-gradient(900px 620px at 50% -12%,#2b1626 0%,rg
   padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
   background:rgba(4,7,13,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .sheet.show{display:flex}
+/* 버전 정보 */
+.verwrap{text-align:center;margin-top:2px}
+.verchip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--muted);border-radius:99px;padding:8px 15px;font-family:inherit;font-size:12px;
+  letter-spacing:.03em;cursor:pointer;min-height:36px}
+.verchip:active{transform:translateY(1px)}
+.verchip b{color:var(--gold);font-weight:700}
+.verNow{margin:0;font-size:12.5px;color:var(--muted)}
+.verNow b{color:var(--gold);font-size:19px;font-weight:800}
+.verList{list-style:none;margin:0;padding:0;max-height:52vh;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;gap:8px}
+.verList>li{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.verList>li.cur{border-color:var(--gold);background:rgba(255,209,102,.07)}
+.vh{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.vh b{font-size:14px;font-weight:800}
+.vtag{font-size:9px;font-weight:800;letter-spacing:.08em;color:#12101a;background:var(--gold);
+  border-radius:5px;padding:2px 6px}
+.vitems p{font-size:12.5px;line-height:1.7;color:var(--muted);margin:0}
 .card{width:100%;max-width:420px;max-height:100%;display:flex;flex-direction:column;gap:12px;
   background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
   box-shadow:0 24px 70px rgba(0,0,0,.6)}
@@ -238,6 +256,16 @@ body.over{background-image:radial-gradient(900px 620px at 50% -12%,#2b1626 0%,rg
       <p id="modeMultiDesc">친구들과 방을 만들어 함께 하는 마피아. 4~8인.</p>
     </button>
     <button class="btn ghost" id="rulesBtn2">규칙 보기</button>
+    <div class="verwrap"><button class="verchip" id="verBtn">버전 <b id="verChipNow">-</b> · 변경 내역</button></div>
+  </div>
+</div>
+
+<!-- 버전 정보 -->
+<div class="sheet" id="verSheet">
+  <div class="card">
+    <div class="cardHead"><h2>버전 정보</h2><button class="ic" id="verX" aria-label="닫기">✕</button></div>
+    <p class="verNow">현재 버전 <b id="verNow">-</b></p>
+    <ol class="verList" id="verList"></ol>
   </div>
 </div>
 
@@ -2620,6 +2648,36 @@ $('#roleOk').onclick=function(){
   startNight();
 };
 $('#rulesBtn').onclick=showHelp;
+/* ================= 버전 정보 ================= */
+var VERSION='2.0.0';
+var CHANGELOG=[
+ {v:'2.0.0',t:['실시간 멀티플레이 추가 — 방 코드·초대 링크로 친구들과 4~8인 플레이',
+               '첫 화면에서 싱글플레이 / 멀티플레이를 고를 수 있습니다',
+               '직업·동료·조사 결과·비밀 채팅은 받는 사람만 열어볼 수 있게 암호화해 전송',
+               '방장도 다른 참가자와 똑같이 직업을 받고 플레이합니다 (권한은 게임 시작과 한 판 더 뿐)',
+               '멀티에는 건너뛰기가 없고 페이즈는 타이머로만 넘어갑니다 (싱글은 그대로 유지)',
+               '허브 복귀 버튼의 터치 영역을 넓히고 스크린리더 이름을 붙였습니다']},
+ {v:'1.0.0',t:['마피아 첫 공개 — AI 7명과 겨루는 8인 클래식전',
+               '마피아 2 · 경찰 · 의사 · 군인 · 정치인 · 영매 · 시민, 직업은 매판 무작위',
+               '밤 → 결과 발표 → 토론 → 투표 → 최후의 반론 → 찬반 투표 순으로 진행',
+               '여론조사, 토론 시간 연장·단축, 정치인 처형 면역, 군인 방탄, 영매 사자 채팅']}
+];
+function openVer(){
+  var sh=$('#verSheet'); if(!sh)return;
+  $('#verNow').textContent='v'+VERSION;
+  $('#verList').innerHTML=CHANGELOG.map(function(c,i){
+    return '<li'+(i===0?' class="cur"':'')+'><div class="vh"><b>v'+esc(c.v)+'</b>'+
+      (i===0?'<span class="vtag">NOW</span>':'')+'</div><div class="vitems">'+
+      c.t.map(function(x){return '<p>· '+esc(x)+'</p>';}).join('')+'</div></li>';
+  }).join('');
+  sh.classList.add('show');
+}
+function closeVer(){ var sh=$('#verSheet'); if(sh)sh.classList.remove('show'); }
+$('#verChipNow').textContent='v'+VERSION;
+$('#verBtn').onclick=openVer;
+$('#verX').onclick=closeVer;
+$('#verSheet').onclick=function(e){ if(e.target===this) closeVer(); };
+
 $('#rulesBtn2').onclick=showHelp;
 $('#helpBtn').onclick=showHelp;
 $('#helpX').onclick=$('#helpX2').onclick=function(){ $('#helpSheet').classList.remove('show'); };
