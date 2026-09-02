@@ -221,7 +221,13 @@ function reject(pid, msg){
 function onState(st){
   if(!st || st.v!==1) return;
   if(st.ph==='closed'){ if(M) closed('방장이 나갔습니다'); return; }
-  if(!M || M.isHost) return;      /* 방을 나간 뒤 늦게 도착한 상태는 버린다 */                                   /* 방장은 자기 상태가 진실이다 */
+  if(!M || M.isHost) return;      /* 방을 나간 뒤 늦게 도착한 상태는 버린다. 방장은 자기 상태가 진실이다 */
+
+  /* 지나간 상태는 **그리지도 않는다.**
+     브로커마다 서로 다른 낡은 상태가 retain 돼 있어(A에 q=40, B에 q=95),
+     목록을 훑는 동안 옛 상태가 섞여 온다. 생존 판정에서만 걸러내고 화면에는 반영하면
+     체력·차례·체인이 과거로 되돌아가 그려진다. 번호가 낮으면 통째로 버린다. */
+  if(typeof st.q==='number' && st.q<=M.lastSeq) return;
 
   M.phase=st.ph; M.turn=st.tn; M.need=st.nd||[]; M.chain=st.ch||[];
   M.limit=st.lm||0; M.winner=st.wn||'';
@@ -235,15 +241,12 @@ function onState(st){
   if(st.rj && st.rj.i===M.myId && st.k>M.lastRej){
     M.lastRej=st.k; say('mMsg', st.rj.m+' · 다시 입력하세요','err');
   }
-  /* 번호가 늘었을 때만 "방장이 살아 있다"로 본다.
-     같은 번호가 다시 오는 것은 브로커에 남아 있던 낡은 상태일 뿐이다.
-     "다르다"가 아니라 "크다"여야 한다 — 방장이 살아 있는 동안 브로커를 옮겼다면
-     브로커마다 서로 다른 낡은 상태가 남는다(A에 q=40, B에 q=95). 목록을 반복해
-     훑으면 40, 95, 40, 95 … 가 번갈아 오고, "다르다"로 보면 전부 생존 신호가 되어
-     죽은 방장을 영영 감지하지 못한다. */
-  if(typeof st.q==='number' && st.q>M.lastSeq){
-    M.lastSeq=st.q; M.seenAt=Date.now(); M.hopAt=0;
-  }
+  /* 여기까지 왔다면 번호가 늘어난 새 상태다 = 방장이 살아 있다.
+     "다르다"가 아니라 "크다"여야 하는 이유는 위 조기 반환의 주석과 같다 —
+     방장이 살아 있는 동안 브로커를 옮기면 40, 95, 40, 95 … 가 번갈아 오는데,
+     "다르다"로 보면 전부 생존 신호가 되어 죽은 방장을 영영 감지하지 못한다. */
+  if(typeof st.q==='number'){ M.lastSeq=st.q; }
+  M.seenAt=Date.now(); M.hopAt=0;
   M.left=st.lf||0;
   runLocalTimer();
   paint();
