@@ -90,8 +90,40 @@
 
   function get(u){
     return fetch(u, {method:'GET'}).then(function(r){
-      if(!r.ok) throw new Error('랭킹을 불러오지 못했습니다 (' + r.status + ')');
+      if(!r.ok){
+        var e = new Error('랭킹을 불러오지 못했습니다 (' + r.status + ')');
+        e.status = r.status;
+        throw e;
+      }
       return r.json();
+    });
+  }
+
+  /* 색인이 없으면 Firebase 가 날짜 정렬 질의를 400 으로 거부한다.
+     그때는 전부 받아 여기서 거른다. 느리지만 화면에 오류를 띄우는 것보다 낫다.
+     색인(".indexOn": ["score","dk","wk"])이 들어오면 이 경로는 한 번도 안 탄다. */
+  var noIndex = false;   /* 한 번 400 을 맞으면 기억한다 — 매번 실패 요청을 보내지 않는다 */
+  var warned = false;
+  function filterHere(game, scope, when){
+    noIndex = true;
+    if(!warned){
+      warned = true;
+      try{
+        console.warn('[RANK] 날짜 색인이 없어 전체를 받아 거르는 중입니다. ' +
+          'Firebase 규칙의 /ranking 에 ".indexOn": ["score","dk","wk"] 를 넣으면 ' +
+          '서버가 기간별 상위만 보내 훨씬 빨라집니다.');
+      }catch(e){}
+    }
+    var field  = (scope === 'day') ? 'dk' : 'wk';
+    var bucket = (scope === 'day') ? dayOf(when) : weekOf(when);
+    return get(url(game)).then(function(obj){
+      var out = {}, k;
+      if(obj) for(k in obj){
+        var v = obj[k];
+        if(v && typeof v.score === 'number' &&
+           String(v[field] || '').indexOf(bucket + '|') === 0) out[k] = v;
+      }
+      return out;
     });
   }
 
@@ -140,7 +172,16 @@
     }else{
       qs = 'orderBy=' + q('score') + '&limitToLast=' + fetchN;
     }
-    return get(url(game, qs)).then(function(obj){ return toList(obj, n, keepDupes); });
+    var isPeriod = (scope === 'day' || scope === 'week');
+    /* 색인이 없는 것을 이미 확인했으면 실패할 요청을 또 보내지 않는다 */
+    var req = (isPeriod && noIndex) ? filterHere(game, scope, when) : get(url(game, qs));
+    if(isPeriod && !noIndex){
+      req = req['catch'](function(e){
+        if(e && e.status === 400) return filterHere(game, scope, when);
+        throw e;
+      });
+    }
+    return req.then(function(obj){ return toList(obj, n, keepDupes); });
   }
 
   function toList(obj, n, keepDupes){
