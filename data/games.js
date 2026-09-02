@@ -102,11 +102,11 @@ window.GAMES = [
   {
     id: "wordbattle",
     title: "영어 끝말잇기",
-    desc: "앞 단어의 마지막 글자로 잇는 영어 단어 대결. AI 기사와 체력을 걸고 겨룬다.",
+    desc: "앞 단어의 마지막 글자로 잇는 영어 단어 대결. 혼자서는 AI 기사와, 여럿이면 최대 8명이 겨룬다.",
     path: "games/wordbattle/index.html",
     emoji: "🔤",
     color: ["#818cf8", "#1e1b4b"],
-    tags: ["영어", "싱글", "퍼즐"],
+    tags: ["영어", "싱글", "멀티", "퍼즐"],
     status: "ready",
     added: "2026-08-28"
   }
