@@ -94,6 +94,12 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
 .mcard p{margin:0;color:var(--dim);font-size:13px}
 
 /* ---------- 기록 / 명예의 전당 ---------- */
+/* 공용 순위판(ranking.js)이 쓰는 색을 이 게임 테마에 맞춘다.
+   모듈 파일은 건드리지 않고 CSS 변수와 클래스만 여기서 덮어쓴다. */
+#hof.rk{--rk-line:var(--line);--rk-dim:var(--dim);--rk-hi:var(--accent);--rk-me:var(--gold)}
+/* 375px 폭에서 탭 3개를 나누면 "🏆 명예의 전당"이 두 줄로 접힌다 */
+#hof .rk-tab{font-size:12.5px;padding:6px 4px;min-width:0;line-height:1.25}
+#hof .rk-tab[aria-selected="true"]{background:rgba(0,229,255,.10)}
 .rec{display:flex;align-items:baseline;gap:8px;border-top:1px solid var(--line);padding:8px 0}
 .rec:first-child{border-top:0}
 .rec .rk{width:26px;color:var(--dim);font-size:13px;flex:none}
@@ -170,6 +176,11 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
 <div id="app"></div>
 <div id="sheet"></div>
 <div id="toast"></div>
+
+<!-- 공용 랭킹 모듈 (games/shared/ranking.js). 명예의 전당·주간·일간을 전부 담당한다.
+     DB 주소·스키마·날짜 칸 계산은 이 파일만 알고 있으면 된다 — 게임은 submit/board만 부른다.
+     classic script라 file:// 에서도 상대경로로 그대로 불린다. -->
+<script src="../shared/ranking.js"></script>
 <script>
 /* =========================================================================
    무한의 계단 (Englknight)  —  games/stairs/index.html
@@ -180,8 +191,11 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-2px}
    ========================================================================= */
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.4.2';
+var VERSION='1.5.0';
 var CHANGELOG=[
+ {v:'1.5.0',t:['순위표에 기간이 생겼다 — 명예의 전당 · 주간 · 일간',
+               '같은 이름은 그 기간의 최고 기록 하나만 보여준다 (한 사람이 도배하지 않도록)',
+               '전체 순위는 예전 명예의 전당 그대로다']},
  {v:'1.4.2',t:['하늘이 바뀌는 고도를 절반으로 낮췄다 — 은하 중심이 2000층에서 1000층으로',
                '대기권 60층 · 우주 250층 · 성운 600층 · 은하 중심 1000층',
                '2000층까지 가는 사람이 없어 마지막 두 구간을 아무도 못 보던 문제']},
@@ -356,66 +370,6 @@ function loadMqtt(){
     })();
   });
 }
-
-/* =========================================================================
-   명예의 전당 (전체 순위표)  —  Firebase Realtime Database (REST)
-   2026-09-01 이관. 이전에는 공용 MQTT 브로커의 retain 메시지를 슬롯 10개로 썼는데,
-   그 브로커는 테스트용이라 주기적으로 비워져 기록이 사흘을 못 넘겼다.
-
-   SDK도 API 키도 쓰지 않는다 — fetch 하나면 된다. 외부 스크립트를 안 불러와야
-   file:// 요건과 "게임당 파일 하나" 관례가 유지된다.
-   (Origin: null 로도 CORS 가 열려 있어 file:// 에서도 호출된다 — 실측 확인)
-
-   서버 규칙이 강제하는 것:
-     · {name: 1~12자, score: 0~99999999 정수, ts: 숫자} 형식을 벗어나면 거부
-     · 추가만 되고 **수정·삭제는 아무도 못 한다** — 남의 기록을 지울 수 없게 하려는 것
-   그래서 슬롯을 덮어쓰던 예전 방식은 통째로 걷어냈다. 순위표 길이 제약도 사라졌다.
-   ========================================================================= */
-var HOF_URL='https://tetris260827-30fe0-default-rtdb.asia-southeast1.firebasedatabase.app/ranking/stairs.json';
-var HOF_TOP=20;
-
-var HOF=(function(){
-  var state='idle', list=null, waiters=[];
-  function finish(ok,l){
-    state=ok?'on':'fail'; list=ok?l:null;
-    var w=waiters; waiters=[];
-    w.forEach(function(fn){fn(list)});
-  }
-  return {
-    load:function(cb){
-      if(state==='on')return cb(list);
-      waiters.push(cb);
-      if(state==='loading')return;
-      state='loading';
-      var done=false;
-      var to=setTimeout(function(){if(!done){done=true;finish(false)}},9000);
-      fetch(HOF_URL+'?orderBy=%22score%22&limitToLast='+HOF_TOP,{cache:'no-store'})
-        .then(function(r){if(!r.ok)throw new Error('http');return r.json()})
-        .then(function(o){
-          if(done)return; done=true; clearTimeout(to);
-          var a=[];
-          if(o)Object.keys(o).forEach(function(k){
-            var e=o[k];
-            if(e&&typeof e.score==='number')
-              a.push({n:cleanName(e.name),f:Math.floor(e.score),t:+e.ts||0});
-          });
-          a.sort(function(x,y){return y.f-x.f||x.t-y.t});
-          finish(true,a);
-        })['catch'](function(){
-          if(done)return; done=true; clearTimeout(to); finish(false);
-        });
-    },
-    ready:function(){return state==='on'},
-    invalidate:function(){state='idle';list=null},
-    submit:function(name,floor,cb){
-      var body={name:cleanName(name).slice(0,12),score:Math.floor(floor),ts:nowMs()};
-      if(!(body.score>0))return cb(false);
-      fetch(HOF_URL,{method:'POST',headers:{'Content-Type':'application/json'},
-                     body:JSON.stringify(body)})
-        .then(function(r){cb(!!r.ok)})['catch'](function(){cb(false)});
-    }
-  };
-})();
 
 /* =========================================================================
    게임 엔진
@@ -982,8 +936,7 @@ var S={
   net:null, netState:'idle',
   peers:{},          // pid -> {n,f,a,seen}
   roster:null,       // 시작 시점에 확정된 참가자 (방장이 뿌린다)
-  gid:'', seed:0, over:null,
-  hof:{state:'idle', list:null}
+  gid:'', seed:0, over:null
 };
 var G=null, V=null, rafId=0, hbT=0, tickT=0;
 
@@ -1041,8 +994,8 @@ function renderHome(){
       '<h4>🧍 싱글플레이</h4><p>혼자 오른다. 어디까지 갈 수 있는지.</p></button>'+
     '<button class="mcard" id="mMulti" aria-label="멀티플레이 — 여럿이 동시에 올라 한 명 남을 때까지">'+
       '<h4>🌐 멀티플레이</h4><p>2~8인이 같은 계단을 동시에. 한 명 남을 때까지.</p></button>'+
-    '<button class="mcard" id="mHof" aria-label="명예의 전당 — 전체 순위표 보기">'+
-      '<h4>🏆 명예의 전당</h4><p>전체 순위표와 내 기록.</p></button>'+
+    '<button class="mcard" id="mHof" aria-label="랭킹 — 명예의 전당·주간·일간 순위표 보기">'+
+      '<h4>🏆 랭킹</h4><p>명예의 전당 · 주간 · 일간 순위와 내 기록.</p></button>'+
   '</div>';
   wireVer();
   $('#mSingle').onclick=function(){startSingle()};
@@ -1055,29 +1008,25 @@ function renderHome(){
    ★ 여기가 죽어도 게임은 온전해야 한다. 로딩은 전부 비동기이고,
      실패해도 "내 기록"은 그대로 뜬다. 게임 시작 경로와 완전히 분리돼 있다.
    ========================================================================= */
-function recRows(list){
-  return list.map(function(e,i){
-    return '<div class="rec"><span class="rk">'+(i+1)+'</span>'+
-      '<span class="nm">'+esc(e.n)+'</span><span class="fl">'+e.f+'층</span></div>';
-  }).join('');
+/* 순위판은 공용 모듈이 통째로 그린다 — 탭 3개, 질의, 초기화 시각 안내,
+   같은 이름 접기, 실패 처리까지 전부 그 안에 있다.
+   여기서는 자리를 만들고 RANK.board 를 부르기만 한다. */
+function hofSlot(){ return '<div id="hof"></div>'; }
+function drawBoard(me){
+  var el=document.getElementById('hof');
+  if(!el)return null;
+  /* 모듈을 못 불러왔어도 게임은 온전해야 한다 — 순위판만 조용히 물러난다 */
+  if(!window.RANK){
+    el.innerHTML='<div class="empty">순위표를 불러오지 못했습니다. (게임에는 영향이 없습니다)</div>';
+    return null;
+  }
+  return RANK.board(el,'stairs',{unit:'층', me:me||null});
 }
-
-function hofCardHtml(){
-  var st=S.hof.state;
-  if(st==='loading')return '<div class="empty">불러오는 중…</div>';
-  if(st==='fail')return '<div class="empty">순위표를 불러오지 못했습니다. (게임에는 영향이 없습니다)</div>';
-  var l=S.hof.list||[];
-  if(!l.length)return '<div class="empty">아직 아무도 오르지 않았습니다. 첫 기록의 주인이 되어보세요.</div>';
-  return recRows(l);
-}
-function loadHof(after){
-  if(S.hof.state==='on')return after&&after();
-  S.hof.state='loading'; after&&after();
-  HOF.load(function(list){
-    S.hof.state=list?'on':'fail';
-    S.hof.list=list;
-    after&&after();
-  });
+function rankReady(){ return !!window.RANK }
+function rankLimitNote(){
+  return '<p class="tiny">기록은 영구 보관되지만 <b>점수는 검증되지 않습니다</b> — '+
+         '누구나 기록을 보낼 수 있고, 한 번 올린 기록은 <b>수정·삭제할 수 없습니다.</b> '+
+         '이름은 신원이 아니라, 다른 사람이 같은 이름을 쓰면 한 줄로 합쳐집니다.</p>';
 }
 function myRecHtml(){
   var a=myRecords();
@@ -1090,26 +1039,18 @@ function myRecHtml(){
 }
 function renderHof(){
   S.screen='hof';
-  function paint(){
-    if(S.screen!=='hof')return;
-    $('#app').innerHTML=
-    '<div class="wrap">'+
-      '<div class="topbar"><button class="hublink" id="back" aria-label="첫 화면으로 돌아가기">← 뒤로</button>'+
-      '<div class="grow"></div></div>'+
-      verChip()+
-      '<h1>🏆 명예의 전당</h1>'+
-      '<div class="card"><div class="cardHead"><h2>전체 순위표</h2></div>'+
-        hofCardHtml()+
-        '<p class="tiny">전체 순위표는 영구 보관되지만 <b>점수는 검증되지 않습니다</b> — 누구나 기록을 보낼 수 있습니다. '+
-        '한 번 올린 기록은 <b>수정·삭제할 수 없습니다.</b></p>'+
-      '</div>'+
-      '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
-    '</div>';
-    wireVer();
-    $('#back').onclick=renderHome;
-  }
-  paint();
-  loadHof(paint);
+  $('#app').innerHTML=
+  '<div class="wrap">'+
+    '<div class="topbar"><button class="hublink" id="back" aria-label="첫 화면으로 돌아가기">← 뒤로</button>'+
+    '<div class="grow"></div></div>'+
+    verChip()+
+    '<h1>🏆 랭킹</h1>'+
+    '<div class="card">'+hofSlot()+rankLimitNote()+'</div>'+
+    '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
+  '</div>';
+  wireVer();
+  $('#back').onclick=renderHome;
+  drawBoard();
 }
 
 /* =========================================================================
@@ -1227,11 +1168,10 @@ function endSingle(){
   stopLoop(); unwirePads(); clearInterval(tickT); tickT=0;
   addRecord(floor,'single');
   S.screen='over';
-  var submitted=false;
+  var submitted=false, myId=null;
   var best=bestFloor();
   function paint(){
     if(S.screen!=='over')return;
-    var canSubmit=(!submitted&&S.hof.state==='on'&&floor>0);
     $('#app').innerHTML=
     '<div class="wrap">'+
       '<div class="topbar"><button class="hublink" id="home" aria-label="첫 화면으로 돌아가기">← 첫 화면</button>'+
@@ -1244,37 +1184,37 @@ function endSingle(){
       '</div>'+
       '<div class="row"><button class="btn" id="again">다시 도전</button>'+
         '<button class="btn ghost" id="home2">첫 화면</button></div>'+
-      '<div class="card"><div class="cardHead"><h2>🏆 명예의 전당</h2></div>'+
-        hofCardHtml()+
-        (canSubmit?'<div style="margin-top:12px">'+
+      '<div class="card">'+
+        (!submitted&&floor>0&&rankReady()?
           '<label class="lbl" for="hofNick">이름 (최대 8자)</label>'+
           '<input type="text" id="hofNick" maxlength="8" value="'+esc(S.name)+'" placeholder="이름">'+
           '<div style="height:10px"></div>'+
-          '<button class="btn" id="hofGo">🏆 명예의 전당에 등록</button></div>':'')+
-        '<p class="tiny">전체 순위표는 영구 보관되지만 <b>점수는 검증되지 않습니다</b> — 누구나 기록을 보낼 수 있습니다. '+
-        '한 번 올린 기록은 <b>수정·삭제할 수 없습니다.</b></p>'+
+          '<button class="btn" id="hofGo">🏆 랭킹에 등록</button>'+
+          '<div style="height:14px"></div>':'')+
+        hofSlot()+rankLimitNote()+
       '</div>'+
       '<div class="card"><div class="cardHead"><h2>🏅 내 기록</h2></div>'+myRecHtml()+'</div>'+
     '</div>';
     wireVer();
     $('#home').onclick=renderHome; $('#home2').onclick=renderHome;
     $('#again').onclick=function(){startSingle()};
+    drawBoard(myId);
     var go=$('#hofGo');
     if(go)go.onclick=function(){
       var nm=cleanName($('#hofNick').value);
       setNick(nm); S.name=nm;
       go.disabled=true; go.textContent='등록 중…';
-      HOF.submit(nm,floor,function(ok){
-        if(ok){submitted=true;HOF.invalidate();
-          S.hof.list=null;S.hof.state='loading';paint();
-          HOF.load(function(l){S.hof.state=l?'on':'fail';S.hof.list=l;paint();});
-          toast('명예의 전당에 등록했습니다');
-        }else{toast('등록하지 못했습니다');go.disabled=false;go.textContent='🏆 명예의 전당에 등록'}
+      RANK.submit('stairs',{name:nm,score:floor}).then(function(r){
+        submitted=true; myId=r&&r.id;
+        toast('랭킹에 등록했습니다');
+        paint();                       /* 다시 그리면 순위판도 새로 읽는다 */
+      })['catch'](function(e){
+        toast('등록하지 못했습니다');
+        go.disabled=false; go.textContent='🏆 랭킹에 등록';
       });
     };
   }
   paint();
-  loadHof(paint);        // 죽은 뒤 비동기로 채운다 — 실패해도 위쪽 기록은 그대로다
 }
 
 /* =========================================================================
