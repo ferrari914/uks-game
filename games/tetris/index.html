@@ -71,6 +71,7 @@ body:not(.touch) #hint{display:block}
 .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line);padding:11px 18px;font-weight:700}
 .btn.ghost:hover{border-color:var(--accent)}
 .btn.sm{padding:10px 18px;font-size:13.5px}
+#rankBoard{--rk-hi:var(--accent);--rk-line:var(--line);--rk-dim:var(--muted);--rk-me:var(--accent)}
 a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 .sheet{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
   padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
@@ -86,20 +87,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .x:hover{color:var(--text);border-color:var(--accent)}
 .status{font-size:11px;color:var(--muted);line-height:1.6}
 .status.warn{color:#ffc46b}
-.rankList{list-style:none;margin:0;padding:0;overflow-y:auto;touch-action:pan-y;
-  -webkit-overflow-scrolling:touch;max-height:52vh;display:flex;flex-direction:column;gap:5px}
-.rankList li{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:9px;
-  background:var(--panel2);border:1px solid transparent;border-radius:10px;padding:8px 10px}
-.rankList li.me{border-color:var(--accent);background:rgba(55,224,240,.09)}
-.pos{font-size:13px;font-weight:800;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
-.rankList li:nth-child(1) .pos{color:#ffd93d}
-.rankList li:nth-child(2) .pos{color:#cfd8ea}
-.rankList li:nth-child(3) .pos{color:#e0954f}
-.who{min-width:0}
-.nm{display:block;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.meta{display:block;font-size:10px;color:var(--muted);margin-top:1px}
-.sc{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
-.empty{font-size:12.5px;color:var(--muted);text-align:center;padding:26px 0;line-height:1.7}
 .scoreLine{font-size:12.5px;color:var(--muted);line-height:1.8}
 .scoreLine b{color:var(--text);font-size:19px;font-variant-numeric:tabular-nums}
 #nameInput{width:100%;background:#0d1220;border:1px solid var(--line);border-radius:10px;
@@ -180,9 +167,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
   </div>
   <div class="sheet" id="rankSheet">
     <div class="card">
-      <div class="cardHead"><h2>랭킹 TOP 50</h2><button class="x" id="rankClose" aria-label="닫기">✕</button></div>
-      <p class="status" id="rankStatus"></p>
-      <ol class="rankList" id="rankList"></ol>
+      <div class="cardHead"><h2>랭킹</h2><button class="x" id="rankClose" aria-label="닫기">✕</button></div>
+      <div id="rankBoard"></div>
+      <p class="status" id="rankNote">점수는 검증되지 않습니다 — 누구나 기록을 보낼 수 있습니다.<br>한 번 올린 기록은 수정·삭제할 수 없습니다.</p>
       <div class="btnRow"><button class="btn ghost sm" id="rankRefresh">새로고침</button></div>
     </div>
   </div>
@@ -228,6 +215,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
     <kbd>Space</kbd> 하드드롭 · <kbd>C</kbd> 홀드 · <kbd>P</kbd> 일시정지 · <kbd>R</kbd> 재시작
   </div>
 </div>
+<script src="../shared/ranking.js"></script>
 <script>
 (function(){
 'use strict';
@@ -283,8 +271,7 @@ var uiLines=document.getElementById('uiLines'), uiBest=document.getElementById('
 var ovSubmit=document.getElementById('ovSubmit'), ovRank=document.getElementById('ovRank');
 var ovDecline=document.getElementById('ovDecline'), ovQuit=document.getElementById('ovQuit');
 var ovHome=document.getElementById('ovHome');
-var rankSheet=document.getElementById('rankSheet'), rankList=document.getElementById('rankList');
-var rankStatus=document.getElementById('rankStatus');
+var rankSheet=document.getElementById('rankSheet'), rankBoard=document.getElementById('rankBoard');
 var nameSheet=document.getElementById('nameSheet'), nameInput=document.getElementById('nameInput');
 var nameScore=document.getElementById('nameScore'), nameErr=document.getElementById('nameErr');
 var nameSubmit=document.getElementById('nameSubmit');
@@ -712,71 +699,36 @@ box.addEventListener('pointerup',endGesture);
 box.addEventListener('pointercancel',endGesture);
 
 /* ---------- 랭킹 ---------- */
-/* RANK.url 이 비어 있으면 이 기기에만 저장(로컬 모드).
-   Firebase Realtime Database 주소를 넣으면 자동으로 전체 공유 랭킹으로 동작합니다. */
-var RANK={
+/* 등재·조회는 공용 모듈(window.RANK, ../shared/ranking.js)이 담당한다.
+   아래 LEGACY 는 공용 모듈 이전에 쓰던 옛 경로 /scores 를 **읽기 전용**으로만 남긴 것이다.
+   규칙이 기록의 삭제·수정을 막고 있어(그게 남의 기록을 지키는 방법이다) 옛 기록을
+   새 경로로 옮길 수 없다. 그래서 명예의 전당에 합쳐서 보여준다.
+   ⚠ 이름을 RANK 로 두면 안 된다 — 이 파일 전체가 IIFE 라 전역 window.RANK 를 가려서
+      공용 submit 대신 이 객체가 조용히 불린다. */
+var LEGACY={
   url:'https://tetris260827-30fe0-default-rtdb.asia-southeast1.firebasedatabase.app',
   path:'scores',
-  lastOffline:false,
-  LKEY:'tetris.rank.local',
-  MKEY:'tetris.rank.mine',
-  shared:function(){ return !!RANK.url; },
-  base:function(){ return RANK.url.replace(/\/+$/,'')+'/'+RANK.path+'.json'; },
-  sort:function(a){
-    a.sort(function(x,y){
-      var d=(y.score||0)-(x.score||0);
-      return d!==0?d:((x.ts||0)-(y.ts||0));
-    });
-    return a;
-  },
-  fetchTop:function(){
-    if(!RANK.shared()){
-      var a=lsGet(RANK.LKEY,[]);
-      for(var i=0;i<a.length;i++) a[i].mine=true;
-      return Promise.resolve(RANK.sort(a));
-    }
-    var u=RANK.base();
-    var pull=function(q){
-      return fetch(u+q).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
-    };
-    return pull('?orderBy=%22score%22&limitToLast=200')
-      .catch(function(){ return pull(''); })
-      .then(function(o){
-        var mine=lsGet(RANK.MKEY,[]), a=[], k;
-        for(k in o){
-          if(!o[k]||typeof o[k]!=='object') continue;
-          var e=o[k]; e.id=k; e.mine=mine.indexOf(k)>=0; a.push(e);
-        }
-        RANK.lastOffline=false;
-        return RANK.sort(a);
-      })['catch'](function(){
-        RANK.lastOffline=true;
-        var a=lsGet(RANK.LKEY,[]);
-        for(var i=0;i<a.length;i++) a[i].mine=true;
-        return RANK.sort(a);
-      });
-  },
-  submit:function(e){
-    if(!RANK.shared()){
-      var a=lsGet(RANK.LKEY,[]);
-      e.id='local-'+e.ts; a.push(e);
-      lsSet(RANK.LKEY,RANK.sort(a).slice(0,200));
-      return Promise.resolve({shared:false});
-    }
-    return fetch(RANK.base(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(e)})
-      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-      .then(function(o){
-        var m=lsGet(RANK.MKEY,[]);
-        if(o&&o.name){ m.push(o.name); lsSet(RANK.MKEY,m.slice(-100)); }
-        return {shared:true};
-      })['catch'](function(){
-        var a=lsGet(RANK.LKEY,[]);
-        e.id='local-'+e.ts; a.push(e);
-        lsSet(RANK.LKEY,RANK.sort(a).slice(0,200));
-        return {shared:false};
-      });
-  }
+  shared:function(){ return !!LEGACY.url; },
+  base:function(){ return LEGACY.url.replace(/\/+$/,'')+'/'+LEGACY.path+'.json'; }
 };
+/* 옛 기록을 공용 모듈의 toList 와 같은 모양으로 돌려준다. 실패하면 빈 배열 —
+   옛 기록 때문에 순위판 전체가 죽으면 손해가 크다(공용 board 쪽에서도 한 번 더 막는다). */
+function legacyAll(){
+  if(!LEGACY.shared()) return Promise.resolve([]);
+  return fetch(LEGACY.base()).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(o){
+    var out=[],k,v;
+    for(k in o){
+      v=o[k];
+      if(!v||typeof v.score!=='number') continue;
+      out.push({id:k,name:v.name,score:v.score,ts:v.ts,raw:v});
+    }
+    return out;
+  })['catch'](function(){ return []; });
+}
+
 function lsGet(k,d){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 
@@ -791,49 +743,17 @@ function nameError(v){
   for(var i=0;i<BADWORDS.length;i++) if(low.indexOf(BADWORDS[i])>=0) return '사용할 수 없는 단어가 포함되어 있어요.';
   return '';
 }
-function pad2(n){ return n<10?('0'+n):String(n); }
-function renderRank(list){
-  rankList.innerHTML='';
-  if(!list.length){
-    var li0=document.createElement('li');
-    li0.style.cssText='background:none;border:none;display:block';
-    li0.innerHTML='<p class="empty">아직 등록된 기록이 없어요.<br>첫 번째 주인공이 되어보세요.</p>';
-    rankList.appendChild(li0);
-    return;
-  }
-  list.slice(0,50).forEach(function(e,i){
-    var li=document.createElement('li');
-    if(e.mine) li.className='me';
-    var ds='';
-    if(e.ts){ var d=new Date(e.ts); ds=' · '+String(d.getFullYear()).slice(2)+'.'+pad2(d.getMonth()+1)+'.'+pad2(d.getDate()); }
-    li.innerHTML='<span class="pos">'+(i+1)+'</span>'+
-      '<span class="who"><span class="nm"></span>'+
-      '<span class="meta">Lv '+(Number(e.level)||1)+' · '+(Number(e.lines)||0)+'줄'+ds+'</span></span>'+
-      '<span class="sc">'+(Number(e.score)||0).toLocaleString()+'</span>';
-    li.querySelector('.nm').textContent=e.name||'익명';
-    rankList.appendChild(li);
-  });
-}
+var rankApi=null;
 function openRank(){
   rankSheet.classList.add('show');
-  rankStatus.className='status';
-  rankStatus.textContent='불러오는 중...';
-  rankList.innerHTML='';
-  RANK.fetchTop().then(function(a){
-    renderRank(a);
-    if(RANK.shared() && !RANK.lastOffline){ rankStatus.textContent='전체 플레이어 '+a.length+'명의 기록'; }
-    else {
-      rankStatus.className='status warn';
-      rankStatus.textContent = RANK.shared()
-        ? '인터넷 랭킹에 연결하지 못해 이 기기에 저장된 기록만 보여주고 있어요.'
-        : '공유 랭킹이 아직 연결되지 않아, 지금은 이 기기에만 저장됩니다.';
-    }
-  })['catch'](function(){
-    rankStatus.className='status warn';
-    rankStatus.textContent='랭킹을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침을 눌러주세요.';
-    renderRank([]);
+  rankApi=window.RANK.board(rankBoard,'tetris',{
+    n:20,
+    extraAll:legacyAll,                          /* 옛 /scores 기록을 명예의 전당에 합친다 */
+    me:lsGet('tetris.rank.lastid','')||undefined
   });
 }
+function reloadRank(){ if(rankApi) rankApi.reload(); else openRank(); }
+
 function openName(){
   if(!lastRun) return;
   nameSheet.classList.add('show');
@@ -851,19 +771,19 @@ function doSubmit(){
   nameErr.textContent='';
   nameSubmit.disabled=true; nameSubmit.textContent='등록 중...';
   lsSet('tetris.rank.name',v);
-  RANK.submit({name:v,score:lastRun.score,level:lastRun.level,lines:lastRun.lines,best:lastRun.best,ts:Date.now()})
+  /* 기록 하나는 한 곳에만 쓴다. 두 곳에 쓰면 한쪽만 성공했을 때 그 불일치가
+     영구히 남는다(기록은 수정·삭제가 불가능하다). */
+  window.RANK.submit('tetris',{
+    name:v, score:lastRun.score,
+    extra:{level:lastRun.level, lines:lastRun.lines, best:lastRun.best}
+  })
     .then(function(res){
       nameSubmit.disabled=false; nameSubmit.textContent='등록하기';
       nameSheet.classList.remove('show');
       ovSubmit.style.display='none';
       lastRun=null;
+      if(res&&res.id) lsSet('tetris.rank.lastid',res.id);   /* 내 기록 강조용 */
       openRank();
-      if(RANK.shared() && res && res.shared===false){
-        setTimeout(function(){
-          rankStatus.className='status warn';
-          rankStatus.textContent='인터넷 랭킹에 연결하지 못해 이 기기에만 저장했어요. 연결되면 다시 등록해주세요.';
-        },600);
-      }
     })['catch'](function(){
       nameSubmit.disabled=false; nameSubmit.textContent='등록하기';
       nameErr.textContent='등록에 실패했어요. 잠시 후 다시 시도해주세요.';
@@ -872,7 +792,7 @@ function doSubmit(){
 ovRank.addEventListener('click',openRank);
 ovSubmit.addEventListener('click',openName);
 document.getElementById('rankClose').addEventListener('click',closeSheets);
-document.getElementById('rankRefresh').addEventListener('click',openRank);
+document.getElementById('rankRefresh').addEventListener('click',reloadRank);
 document.getElementById('nameClose').addEventListener('click',closeSheets);
 document.getElementById('nameCancel').addEventListener('click',closeSheets);
 nameSubmit.addEventListener('click',doSubmit);
@@ -1015,8 +935,9 @@ quizClose.addEventListener('click',function(){ if(quizAnswered) finishQuiz(); el
 quizSheet.addEventListener('click',function(e){ if(e.target!==quizSheet) return; if(quizAnswered) finishQuiz(); else closeQuiz(); });
 
 /* ---------- 버전 정보 ---------- */
-var VERSION='1.6.0';
+var VERSION='1.7.0';
 var CHANGELOG=[
+ {v:'1.7.0',t:['공용 랭킹 연동 — 명예의 전당(영구)·주간·일간 3종 랭킹','주간은 월요일 0시, 일간은 매일 0시(한국 시간)에 새 순위가 시작된다. 지난 기록은 지워지지 않는다','옛 기록은 옮길 수 없어(삭제·수정 불가) 명예의 전당에 합쳐서 보여준다','같은 이름은 그 기간의 최고 기록 한 줄만 표시']},
  {v:'1.6.0',t:['부활에 성공하면 보드를 전부 비운다 (기존에는 위쪽 절반만 비워, 낙하 속도가 그대로라 금방 다시 죽었다)']},
  {v:'1.5.1',t:['코드 최적화 — 화면이 바뀔 때만 다시 그리도록 개선(정지 화면에서 CPU·배터리 절약), 리사이즈 처리 통합']},
  {v:'1.5.0',t:['시작 화면과 결과 화면에 “홈으로” 버튼 추가 (일시정지 중에는 실수 방지를 위해 숨김)']},
