@@ -291,10 +291,13 @@
     s.textContent =
       '.rk{--rk-line:#262b40;--rk-dim:#8b93ad;--rk-hi:#00e5ff;--rk-me:#ff2d95}' +
       '.rk-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}' +
-      '.rk-tab{flex:1;min-width:88px;min-height:44px;padding:8px 10px;cursor:pointer;' +
+      /* 탭 3개가 375px 한 줄에 들어가야 한다. "🏆 명예의 전당"이 가장 길어서
+         min-width 를 두면 접힌다 — 폭은 내용에 맡기고 높이만 44px 을 지킨다. */
+      '.rk-tab{flex:1;min-width:0;min-height:44px;padding:8px 5px;cursor:pointer;' +
         'background:transparent;color:var(--rk-dim);border:1px solid var(--rk-line);' +
-        'border-radius:10px;font:inherit;font-size:.92em}' +
-      '.rk-tab[aria-selected="true"]{color:var(--rk-hi);border-color:var(--rk-hi)}' +
+        'border-radius:10px;font:inherit;font-size:.82em;line-height:1.25}' +
+      '.rk-tab[aria-selected="true"]{color:var(--rk-hi);border-color:var(--rk-hi);' +
+        'background:rgba(0,229,255,.10)}' +
       '.rk-sub{margin:0 0 10px;font-size:.8em;color:var(--rk-dim)}' +
       '.rk-list{list-style:none;margin:0;padding:0}' +
       '.rk-row{display:flex;align-items:center;gap:10px;padding:9px 2px;' +
