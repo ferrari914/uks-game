@@ -157,19 +157,25 @@
        "누가 많이 했나"가 된다. 같은 이름은 최고 기록 한 줄만 남긴다.
        ⚠ 이름은 신원이 아니다 — 다른 사람이 같은 이름을 쓰면 합쳐진다.
           로그인이 없는 한 피할 수 없다. 화면에 그 사실을 적어 둘 것. */
-    if(!keepDupes){
-      var seen = {}, uniq = [];
-      for(var j=0;j<out.length;j++){
-        var key = String(out[j].name||'');
-        if(seen[key]) continue;
-        seen[key] = 1; uniq.push(out[j]);
-      }
-      out = uniq;
-    }
+    if(!keepDupes) out = dedupeByName(out);
     out = out.slice(0, n);
     for(var i=0;i<out.length;i++) out[i].rank = i + 1;
     return out;
   }
+
+  /* 점수 내림차순으로 이미 정렬된 배열에서 같은 이름의 뒷줄을 버린다 */
+  function dedupeByName(arr){
+    var seen = {}, uniq = [];
+    for(var j=0;j<arr.length;j++){
+      var key = String(arr[j].name==null?'':arr[j].name);
+      if(seen[key]) continue;
+      seen[key] = 1; uniq.push(arr[j]);
+    }
+    return uniq;
+  }
+
+  /* toList 와 같은 정렬 기준. 두 곳이 어긋나면 탭마다 동점자 순서가 뒤집힌다. */
+  function bySCore(x,y){ return (y.score - x.score) || ((x.ts||0) - (y.ts||0)); }
 
   /* ---- 3탭 순위판 ----
      el     : 넣을 자리
@@ -219,7 +225,28 @@
       sub.textContent = meta.sub + (k==='all' ? '' : ' · 다음 초기화 ' + human(nextReset(k)));
       body.innerHTML = '<p class="rk-msg">불러오는 중…</p>';
 
-      top(game, k, n, null, opts.keepDupes).then(function(list){
+      /* 명예의 전당만 다른 곳에서 더 가져와야 하는 게임이 있다 — 테트리스는 옛 경로
+         /scores 에 옮길 수 없는 기록이 남아 있다(규칙이 삭제·수정을 막는다).
+         opts.extraAll 은 그 옛 기록을 toList 와 같은 모양
+         ({id,name,score,ts,raw})으로 돌려주면 된다.
+         ⚠ 합친 뒤 순위를 **다시 매긴다** — toList 가 이미 1부터 박아 두므로
+            그냥 이어붙이면 1위가 두 명 나온다. 그래서 이 처리는 board 안에 있어야 한다.
+         ⚠ 실패해도 명예의 전당 자체는 떠야 한다. 옛 기록 때문에 순위판이 죽으면 손해가 크다. */
+      var p = top(game, k, n, null, opts.keepDupes);
+      if(k === 'all' && opts.extraAll){
+        p = Promise.all([
+          p,
+          Promise.resolve().then(opts.extraAll).catch(function(){ return []; })
+        ]).then(function(r){
+          var a = r[0].concat(r[1] || []);
+          a.sort(bySCore);
+          if(!opts.keepDupes) a = dedupeByName(a);
+          a = a.slice(0, n);
+          for(var i=0;i<a.length;i++) a[i].rank = i + 1;
+          return a;
+        });
+      }
+      p.then(function(list){
         if(cur !== k) return;                     /* 그새 탭을 바꿨으면 버린다 */
         if(!list.length){
           body.innerHTML = '<p class="rk-msg">' +
